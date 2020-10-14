@@ -102,7 +102,9 @@ get_fg_wp <- function(df) {
     1 - df %>%
     flip_team() %>%
     mutate(
-      yardline_100 = (100 - yardline_100) - 7
+      yardline_100 = (100 - yardline_100) - 7,
+      # yardline_100 can't be bigger than 80
+      yardline_100 = if_else(yardline_100 > 80, 80, yardline_100)
     ) %>%
     nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%

@@ -11,17 +11,20 @@ library(shinythemes)
 # for fg model
 load('data/sysdata.rda', .GlobalEnv)
 
+# for distribution of punt outcomes
+punt_df <- readRDS("data/punt_data.rds")
+
 # for go for it model
-# load(url('https://github.com/guga31bb/nflfastR-data/blob/master/models/fd_model.Rdata?raw=true'), .GlobalEnv)
 load('data/fd_model.Rdata', .GlobalEnv)
 
+# get teams and logos
 teams <- nflfastR::teams_colors_logos %>%
   filter(!team_abbr %in% c("LAR", "SD", "STL", "OAK"))
 
+# team abbreviations for dropdown menus
 ids <- teams %>%
   pull(team_abbr)
   
-punt_df <- readRDS("data/punt_data.rds")
 
 #####################################################################################
 ######## Define UI for viewer app ###########################################
@@ -35,18 +38,15 @@ ui <- function(request) {
     # theme = shinytheme("sandstone"),
     # shinythemes::themeSelector(),
     
-  
     # App title ----
     titlePanel("Fourth Down Decision Calculator"),
-    
     
     # Main panel for displaying outputs ----
     mainPanel(
       
       navbarPage("rbsdm.com/stats",
                  tabPanel("Result",
-                          # Output: Header + table of distribution ----
-                          
+
                           fluidRow(
                             column(3, align = "center",
                                    bookmarkButton(),
