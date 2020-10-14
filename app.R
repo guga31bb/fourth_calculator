@@ -1,8 +1,8 @@
 # to-do
-# figure out what to do with offensive penalties
+
 # fg can't be inside 20
 # https://twitter.com/fbgchase/status/1316157100834381826
-# cap fg distance
+
 
 source('R/helpers.R')
 library(shiny)
