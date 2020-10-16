@@ -1,6 +1,67 @@
 library(tidyverse)
 library(gt)
 
+# for fg model
+load('data/sysdata.rda', .GlobalEnv)
+
+# for distribution of punt outcomes
+punt_df <- readRDS("data/punt_data.rds")
+
+# for go for it model
+load('data/fd_model.Rdata', .GlobalEnv)
+
+
+# data prep
+prepare_df <- function(df) {
+  
+  home <- df$home_team
+  away <- df$away_team
+  yr <- df$yr
+  
+  games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"))
+  lines <- games %>%
+    filter(
+      home_team == home,
+      away_team == away,
+      season == yr
+    ) %>%
+    mutate(roof = if_else(roof == "open" | roof == "closed" | is.na(roof), "retractable", roof)) %>%
+    select(game_id, spread_line, total_line, roof)
+  
+  df %>%
+    mutate(
+      # fill in who receives 2h kickoff
+      receive_2h_ko = case_when(
+        # 1st half, home team opened game with kickoff, away team has ball
+        qtr <= 2 & home_opening_kickoff == 1 & posteam == away_team ~ 1,
+        # 1st half, away team opened game with kickoff, home team has ball
+        qtr <= 2 & home_opening_kickoff == 0 & posteam == home_team ~ 1,
+        TRUE ~ 0
+      ),
+      down = 4,
+      season = 2020,
+      spread_line = lines$spread_line,
+      total_line = lines$total_line,
+      roof = lines$roof,
+      half_seconds_remaining = if_else(qtr == 2 | qtr == 4, time, time + 900),
+      game_seconds_remaining = if_else(qtr <= 2, half_seconds_remaining + 1800, half_seconds_remaining),
+      model_roof = roof,
+      era = 3,
+      era3 = 0,
+      era4 = 1,
+      posteam_spread = if_else(posteam == home_team, spread_line, -spread_line),
+      home_total = (total_line + spread_line) / 2,
+      away_total = (total_line - spread_line) / 2,
+      posteam_total = if_else(posteam == home_team, home_total, away_total),
+      posteam_spread = dplyr::if_else(posteam == home_team, spread_line, -1 * spread_line),
+      retractable = dplyr::if_else(model_roof == 'retractable', 1, 0),
+      dome = dplyr::if_else(model_roof == 'dome', 1, 0),
+      outdoors = dplyr::if_else(model_roof == 'outdoors', 1, 0)
+    ) %>%
+    return()
+  
+}
+
 
 # helper function for switching possession and running off 6 seconds
 flip_team <- function(df) {
@@ -32,54 +93,6 @@ flip_team <- function(df) {
   
 }
 
-prepare_df <- function(df) {
-  
-  home <- df$home_team
-  away <- df$away_team
-  yr <- df$yr
-  
-  games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"))
-  lines <- games %>%
-    filter(
-      home_team == home,
-      away_team == away,
-      season == yr
-    ) %>%
-    select(game_id, spread_line, total_line)
-  
-  df %>%
-    mutate(
-      # fill in who receives 2h kickoff
-      receive_2h_ko = case_when(
-        # 1st half, home team opened game with kickoff, away team has ball
-        qtr <= 2 & home_opening_kickoff == 1 & posteam == away_team ~ 1,
-        # 1st half, away team opened game with kickoff, home team has ball
-        qtr <= 2 & home_opening_kickoff == 0 & posteam == home_team ~ 1,
-        TRUE ~ 0
-      ),
-      down = 4,
-      season = 2020,
-      spread_line = lines$spread_line,
-      total_line = lines$total_line,
-      half_seconds_remaining = if_else(qtr == 2 | qtr == 4, time, time + 900),
-      game_seconds_remaining = if_else(qtr <= 2, half_seconds_remaining + 1800, half_seconds_remaining),
-      model_roof = roof,
-      era = 3,
-      era3 = 0,
-      era4 = 1,
-      posteam_spread = if_else(posteam == home_team, spread_line, -spread_line),
-      home_total = (total_line + spread_line) / 2,
-      away_total = (total_line - spread_line) / 2,
-      posteam_total = if_else(posteam == home_team, home_total, away_total),
-      posteam_spread = dplyr::if_else(posteam == home_team, spread_line, -1 * spread_line),
-      retractable = dplyr::if_else(model_roof == 'retractable', 1, 0),
-      dome = dplyr::if_else(model_roof == 'dome', 1, 0),
-      outdoors = dplyr::if_else(model_roof == 'outdoors', 1, 0)
-    ) %>%
-    return()
-  
-}
-
 get_fg_wp <- function(df) {
   
   # probability field goal is made
@@ -102,7 +115,7 @@ get_fg_wp <- function(df) {
     1 - df %>%
     flip_team() %>%
     mutate(
-      yardline_100 = (100 - yardline_100) - 7,
+      yardline_100 = (100 - yardline_100) - 8,
       # yardline_100 can't be bigger than 80
       yardline_100 = if_else(yardline_100 > 80, 80, yardline_100)
     ) %>%
@@ -114,19 +127,19 @@ get_fg_wp <- function(df) {
   
   results <- list(fg_wp, fg_prob, fg_miss_wp, fg_make_wp)
   
-  message(glue::glue(
-    "
-    --------
-    KICK FIELD GOAL RESULTS
-    --------
-    FG make prob: {round(fg_prob, 2)}
-    
-    FG miss WP: {round(fg_miss_wp, 2)}
-    FG make WP: {round(fg_make_wp, 2)}
-    --------
-    FG WP: {round(fg_wp, 2)}
-    "
-  ))
+  # message(glue::glue(
+  #   "
+  #   --------
+  #   KICK FIELD GOAL RESULTS
+  #   --------
+  #   FG make prob: {round(fg_prob, 2)}
+  #   
+  #   FG miss WP: {round(fg_miss_wp, 2)}
+  #   FG make WP: {round(fg_make_wp, 2)}
+  #   --------
+  #   FG WP: {round(fg_wp, 2)}
+  #   "
+  # ))
   
   return(results)
 }
@@ -179,7 +192,7 @@ get_punt_wp <- function(df, punt_df) {
       pull(wp) %>%
       return()
   } else {
-    message("Too close for punting")
+    # message("Too close for punting")
     return(NA_real_)
   }
   
@@ -205,7 +218,7 @@ get_go_wp <- function(df) {
     bind_cols(df[rep(1, 76), ]) %>%
     mutate(
       gain = -10:65,
-      gain = if_else(gain > yardline_100, yardline_100, as.integer(gain))
+      gain = if_else(gain > yardline_100, as.integer(yardline_100), as.integer(gain))
     ) %>%
     group_by(gain) %>%
     mutate(prob = sum(prob)) %>%
@@ -218,7 +231,7 @@ get_go_wp <- function(df) {
       turnover = dplyr::if_else(gain < ydstogo, as.integer(1), as.integer(0)),
       down = 1,
       # if now goal to go, use yardline, otherwise it's 1st and 10 either way
-      ydstogo = dplyr::if_else(yardline_100 < 10, yardline_100, as.integer(10)),
+      ydstogo = dplyr::if_else(yardline_100 < 10, as.integer(yardline_100), as.integer(10)),
       # possession change if 4th down failed
       # flip yardline_100, timeouts for turnovers
       yardline_100 = dplyr::if_else(.data$turnover == 1, as.integer(100 - .data$yardline_100), as.integer(.data$yardline_100)),
@@ -284,19 +297,19 @@ get_go_wp <- function(df) {
   wp_succeed <- report %>% filter(fd == 1) %>% pull(wp)
   wp_go <- preds %>% summarize(wp = sum(wt_wp)) %>% pull(wp)
   
-  message(glue::glue(
-    "
-    --------
-    GO FOR IT RESULTS
-    --------
-    First down prob: {first_down_prob %>% round(2)}
-    
-    WP fail: {wp_fail %>% round(2)}
-    WP succeed: {wp_succeed %>% round(2)}
-    --------
-    Go WP: {wp_go %>% round(2)}
-    "
-  ))
+  # message(glue::glue(
+  #   "
+  #   --------
+  #   GO FOR IT RESULTS
+  #   --------
+  #   First down prob: {first_down_prob %>% round(2)}
+  #   
+  #   WP fail: {wp_fail %>% round(2)}
+  #   WP succeed: {wp_succeed %>% round(2)}
+  #   --------
+  #   Go WP: {wp_go %>% round(2)}
+  #   "
+  # ))
   
   results <- list(
     wp_go,
@@ -437,7 +450,7 @@ make_table <- function(df, current_situation) {
       locations = cells_column_labels(3)
     )  %>%
     tab_header(
-      title = md(glue::glue("{case_when(current_situation$score_differential < 0 ~ 'Down', current_situation$score_differential == 0 ~ 'Tied', current_situation$score_differential > 0 ~ 'Up')} {abs(current_situation$score_differential)}, 4th & {current_situation$ydstogo}, {current_situation$yardline_100} yards from opponent end zone")),
+      title = md(glue::glue("{case_when(current_situation$score_differential < 0 ~ 'Down', current_situation$score_differential == 0 ~ 'Tied', current_situation$score_differential > 0 ~ 'Up')} {ifelse(current_situation$score_differential == 0, 'up', abs(current_situation$score_differential))}, 4th & {current_situation$ydstogo}, {current_situation$yardline_100} yards from opponent end zone")),
       subtitle = md(glue::glue("Qtr {current_situation$qtr}, {hms::hms(current_situation$time) %>% substr(4, 8)}"))
     )
   

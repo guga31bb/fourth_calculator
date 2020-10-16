@@ -8,15 +8,6 @@ source('R/helpers.R')
 library(shiny)
 library(shinythemes)
 
-# for fg model
-load('data/sysdata.rda', .GlobalEnv)
-
-# for distribution of punt outcomes
-punt_df <- readRDS("data/punt_data.rds")
-
-# for go for it model
-load('data/fd_model.Rdata', .GlobalEnv)
-
 # get teams and logos
 teams <- nflfastR::teams_colors_logos %>%
   filter(!team_abbr %in% c("LAR", "SD", "STL", "OAK"))
@@ -48,84 +39,64 @@ ui <- function(request) {
                  tabPanel("Result",
 
                           fluidRow(
-                            column(3, align = "center",
-                                   bookmarkButton(),
+                            column(12, align = "center",
+                                   bookmarkButton()
+                            )),
+                          fluidRow(
+                            column(4, align = "center",
                                    
+                                   tags$h3("Game"),
+
                                    selectInput(
                                      inputId =  "season", 
                                      label = "Season:", 
                                      choices = 2018:2020,
                                      selected = 2020
                                    ),
-                                   
-                                   
+
                                    selectInput("posteam",
-                                               "Possession team:",
-                                               c(sort(unique(as.character(ids)))), selected = "TEN"),
+                                               "Offense:",
+                                               c(sort(unique(as.character(ids)))), selected = "TB"),
                                    
                                    selectInput("away",
                                                "Away team:",
-                                               c(sort(unique(as.character(ids)))), selected = "BUF"),
+                                               c(sort(unique(as.character(ids)))), selected = "TB"),
                                    
                                    selectInput("home",
                                                "Home team:",
-                                               c(sort(unique(as.character(ids)))), selected = "TEN"),
-                                   selectInput("roof",
-                                               "Roof:",
-                                               c("outdoors", "dome", "retractable"), selected = "outdoors")
+                                               c(sort(unique(as.character(ids)))), selected = "CHI"),
+                                   
+                                   radioButtons("home_ko",
+                                                label = "Did home team get opening kickoff?:",
+                                                choices = list("0" = 0, "1" = 1),
+                                                inline = T,
+                                                selected = "0")
+                                   
                                    
                                    ),
-                            column(3, align = "center",
+                            column(4, align = "center",
                                    
-                                   
+                                   tags$h3("Time"),
                                    radioButtons("qtr",
                                                 label = "Quarter:",
                                                 choices = list("1" = 1, "2" = 2, "3" = 3, "4" = 4),
                                                 inline = T,
-                                                selected = "1"),
+                                                selected = "4"),
                                    
                                    sliderInput(
                                      inputId =  "mins", 
                                      label = "Minutes left in quarter:", 
                                      min = 0, max = 15,
-                                     value = 2
+                                     value = 4
                                    ),
                                    
                                    sliderInput(
                                      inputId =  "secs", 
                                      label = "Seconds left in quarter:", 
                                      min = 0, max = 59,
-                                     value = 0
+                                     value = 52
                                    ),
-                                   
-                                   sliderInput(
-                                     inputId =  "ydstogo", 
-                                     label = "Yards to go:", 
-                                     min = 1, max = 30,
-                                     value = 1
-                                   )
-                                   
-                                   
-                                   
-                            ),
-                            
-                            column(3, align = "center",
-                                   
-                                   
-                                   sliderInput(
-                                     inputId =  "yardline", 
-                                     label = "Yards from opponent EZ:", 
-                                     min = 1, max = 90,
-                                     value = 60
-                                   ),
-                                   
-                                   sliderInput(
-                                     inputId =  "score_diff", 
-                                     label = "Score differential:", 
-                                     min = -21, max = 21,
-                                     value = 0
-                                   ),
-                                   
+
                                    radioButtons("posteam_to",
                                                 label = "Offense timeouts:",
                                                 choices = list("0" = 0, "1" = 1, "2" = 2, "3" = 3),
@@ -139,24 +110,52 @@ ui <- function(request) {
                                                 selected = "3"),
                                    
                                    
-                                   actionButton("update", "Update", width = '100%')
-                                   ),
-                            column(3, align = "center",
                                    
-                                   radioButtons("home_ko",
-                                                label = "Did home team get opening kickoff?:",
-                                                choices = list("0" = 0, "1" = 1),
-                                                inline = T,
-                                                selected = "0"),
+                                   
+                                   
+                            ),
+                            
+                            column(4, align = "center",
+                                   
+                                   tags$h3("Situation"),
+
+                                   sliderInput(
+                                     inputId =  "ydstogo", 
+                                     label = "Yards to go:", 
+                                     min = 1, max = 30,
+                                     value = 1
+                                   ),
+                                   
+                                   sliderInput(
+                                     inputId =  "yardline", 
+                                     label = "Yards from opponent EZ:", 
+                                     min = 1, max = 90,
+                                     value = 7
+                                   ),
+                                   
+                                   sliderInput(
+                                     inputId =  "score_diff", 
+                                     label = "Score differential:", 
+                                     min = -28, max = 28,
+                                     value = -2
+                                   ),
                                    
                                    sliderInput(
                                      inputId =  "runoff", 
-                                     label = "Advanced setting: additional seconds to run off clock after successful conversion", 
+                                     label = "Advanced: additional seconds to run off clock after successful conversion", 
                                      min = 0, max = 40,
                                      value = 0
                                    )
-                            )
+                                   
+                                   
+                                   )
+
                           ),
+                          
+                          fluidRow(
+                            column(12, align = "center",
+                                   actionButton("update", "Update", width = '50%')
+                            )),
 
                           fluidRow(
                             column(12, align = "center",
@@ -220,7 +219,6 @@ server <- function(input, output) {
   # input$qtr <- 4
   # input$mins <- 2
   # input$secs <- 0
-  # input$roof <- "outdoors"
   # input$posteam <- "MIN"
   # input$away <- "MIN"
   # input$home <- "SEA"
@@ -239,7 +237,6 @@ server <- function(input, output) {
       tibble::tibble(
         "qtr" = as.integer(input$qtr),
         "time" = 60 * as.integer(input$mins) + as.integer(input$secs),
-        'roof' = as.character(input$roof),
         'posteam' = as.character(input$posteam),
         'away_team' = as.character(input$away),
         'home_team' = as.character(input$home),
