@@ -416,8 +416,7 @@ make_table <- function(df, current_situation) {
     fmt_number(
       columns = vars(choice_prob, success_prob, success_wp, fail_wp), decimals = 0
     ) %>%
-    tab_source_note(md("**Table**: @benbbaldwin | **Data**: @nflfastR | 
-                       **Code for pretty table**: @thomas_mock"
+    tab_source_note(md("**Please cite**: Ben Baldwin's fourth down model"
     )) %>%
     tab_style(
       style = list(
