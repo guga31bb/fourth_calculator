@@ -10,16 +10,16 @@ punt_df <- readRDS("data/punt_data.rds")
 # for go for it model
 load('data/fd_model.Rdata', .GlobalEnv)
 
+games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
+  mutate(game_type = if_else(game_type == "REG", "reg", "post"))
 
 # data prep
-prepare_df <- function(df) {
+prepare_df <- function(df, games) {
   
   home <- df$home_team
   away <- df$away_team
   yr <- df$yr
   
-  games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
-    mutate(game_type = if_else(game_type == "REG", "reg", "post"))
   lines <- games %>%
     filter(
       home_team == home,

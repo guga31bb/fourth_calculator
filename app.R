@@ -255,7 +255,7 @@ server <- function(input, output) {
         'runoff' = as.integer(input$runoff),
         'yr' = as.integer(input$season)
       ) %>%
-        prepare_df()
+        prepare_df(games)
       
     } , ignoreNULL = FALSE
   )
