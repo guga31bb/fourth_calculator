@@ -180,7 +180,7 @@ ui <- function(request) {
                           
                           tags$br(),
                           
-                          tags$p("Notes: these are ESTIMATES; please use accordingly. On 4th and 1, the model cannot know whether it's a long 1 or a short 1. Shorter distance would favor going. Do not use this in overtime.")
+                          tags$p("Notes: these are ESTIMATES; please use accordingly. On 4th and 1, the model cannot know whether it's a long 1 or a short 1. Shorter distance would favor going. Do not use this in overtime. Use with EXTREME CAUTION in the final minute of a game as the model is not good with end of game clock scenarios.")
                           
 
                           
@@ -188,7 +188,7 @@ ui <- function(request) {
                  ),
                  
                  tabPanel("About",
-                          p("Notes: Data from @nflfastR. A thank you to Lee Sharpe (@LeeSharpeNFL) for hosting an updating source for game results. Website by Ben Baldwin (@benbbaldwin) and Sebastian Carl (@mrcaseb).")
+                          p("Notes: Data from @nflfastR. A thank you to Lee Sharpe (@LeeSharpeNFL) for hosting an updating source for game results and to Thomas Mock (@thomas_mock) for code to make the table look better. Website by Ben Baldwin (@benbbaldwin). Model writeup coming at some point...")
                           
                  )
                  
