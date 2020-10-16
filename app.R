@@ -53,7 +53,12 @@ ui <- function(request) {
                                      choices = 2018:2020,
                                      selected = 2020
                                    ),
-
+                                   
+                                   radioButtons("type",
+                                                label = "Type:",
+                                                choices = list("Regular" = "reg","Postseason" = "post"),
+                                                selected = "reg"),
+                                   
                                    selectInput("posteam",
                                                "Offense:",
                                                c(sort(unique(as.character(ids)))), selected = "TB"),
@@ -235,6 +240,7 @@ server <- function(input, output) {
     {
  
       tibble::tibble(
+        "type" = as.character(input$type),
         "qtr" = as.integer(input$qtr),
         "time" = 60 * as.integer(input$mins) + as.integer(input$secs),
         'posteam' = as.character(input$posteam),

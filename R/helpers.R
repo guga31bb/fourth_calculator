@@ -18,12 +18,14 @@ prepare_df <- function(df) {
   away <- df$away_team
   yr <- df$yr
   
-  games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"))
+  games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
+    mutate(game_type = if_else(game_type == "REG", "reg", "post"))
   lines <- games %>%
     filter(
       home_team == home,
       away_team == away,
-      season == yr
+      season == yr,
+      game_type == df$type
     ) %>%
     mutate(roof = if_else(roof == "open" | roof == "closed" | is.na(roof), "retractable", roof)) %>%
     select(game_id, spread_line, total_line, roof)
