@@ -1,9 +1,10 @@
 library(tidyverse)
+
+# for getting data ready for the model
 source('https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R')
 
 # **************************************************************************************
 # data
-
 seasons <- 2014:2019
 pbp <- purrr::map_df(seasons, function(x) {
   readRDS(
@@ -25,6 +26,12 @@ pbp <- purrr::map_df(seasons, function(x) {
 
 model_vars <- pbp %>% 
   mutate(yards_gained = 
+           
+           # we need a way to account for defensive penalties that give auto first downs
+           # we're saying here that a penalty that gives a first down goes for the yards to go
+           # unless the actual penalty yardage is higher
+           # the draw back is that a defensive holding on eg 4th and 8 is coded as an 8 yard gain
+           # but the alternative is to estimate a separate model for penalties and that is too much
            case_when(
              first_down_penalty == 1 & penalty_yards < ydstogo ~ ydstogo, 
              first_down_penalty == 1 & penalty_yards >= ydstogo ~ penalty_yards, 
@@ -38,6 +45,7 @@ model_vars <- pbp %>%
          posteam_total = if_else(posteam == home_team, home_total, away_total),
          posteam_spread = dplyr::if_else(posteam == home_team, spread_line, -1 * spread_line)
   ) %>%
+  # look at when an actual play is run or a defensive penalty gives a first down
   filter(play_type_nfl %in% c("RUSH", "PASS", "SACK") | first_down_penalty == 1) %>%
   mutate(label = yards_gained) %>%
   select(

@@ -1,9 +1,3 @@
-# to-do
-
-# fg can't be inside 20
-# https://twitter.com/fbgchase/status/1316157100834381826
-
-
 source('R/helpers.R')
 library(shiny)
 library(shinythemes)
@@ -16,7 +10,6 @@ teams <- nflfastR::teams_colors_logos %>%
 ids <- teams %>%
   pull(team_abbr)
   
-
 #####################################################################################
 ######## Define UI for viewer app ###########################################
 #####################################################################################
@@ -219,7 +212,7 @@ server <- function(input, output) {
   # input$update (the action button), so that the output is only
   # updated when the user clicks the button
 
-
+  # uncomment only for testing
   # input <- NULL
   # input$qtr <- 4
   # input$mins <- 2
@@ -234,7 +227,8 @@ server <- function(input, output) {
   # input$home_ko <- 0
   # input$score_diff <- 5
   # 
-  #nflscrapr: full data
+
+  # get the situation from user input
   fullInput <- eventReactive(
     input$update,
     {
@@ -260,6 +254,7 @@ server <- function(input, output) {
     } , ignoreNULL = FALSE
   )
   
+  # get the data that goes in the table
   tableData <- eventReactive(
     input$update,
     {
@@ -269,12 +264,12 @@ server <- function(input, output) {
     } , ignoreNULL = FALSE
   )
   
-  
-  #home team summary table
+  # make the table
   output$view1 <- render_gt(
       expr = make_table(tableData(), fullInput())
   )
   
+  # for the team logo above decision
   output$picture <-
     renderText({
       c(
@@ -284,17 +279,15 @@ server <- function(input, output) {
       )
     })
   
+  # say what the right decision is
   output$some_text <- renderText({ 
     
-
     return(glue::glue("<font size='+2'>Correct choice: <span style='color:red'>{tableData() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice)}</span> (difference: 
       <span style='color:green'> <strong> {round(tableData() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice_prob) - tableData() %>% arrange(-choice_prob) %>% dplyr::slice(2) %>% pull(choice_prob), 1)}%</strong></span>)</font>"))
 
   })
   
-  
 }
-
 
 # Create Shiny app ----
 shinyApp(ui, server, enableBookmarking = "url")

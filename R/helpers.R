@@ -2,7 +2,7 @@ library(tidyverse)
 library(gt)
 
 # for fg model
-load('data/sysdata.rda', .GlobalEnv)
+load('data/fg_model.Rdata', .GlobalEnv)
 
 # for distribution of punt outcomes
 punt_df <- readRDS("data/punt_data.rds")
@@ -10,16 +10,18 @@ punt_df <- readRDS("data/punt_data.rds")
 # for go for it model
 load('data/fd_model.Rdata', .GlobalEnv)
 
+# load games file for getting game total, point spread, and roof
 games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
   mutate(game_type = if_else(game_type == "REG", "reg", "post"))
 
-# data prep
+# data prep function
 prepare_df <- function(df, games) {
   
   home <- df$home_team
   away <- df$away_team
   yr <- df$yr
   
+  # get lines and roof from games file
   lines <- games %>%
     filter(
       home_team == home,
@@ -41,13 +43,14 @@ prepare_df <- function(df, games) {
         TRUE ~ 0
       ),
       down = 4,
-      season = 2020,
+      season = df$yr,
       spread_line = lines$spread_line,
       total_line = lines$total_line,
       roof = lines$roof,
       half_seconds_remaining = if_else(qtr == 2 | qtr == 4, time, time + 900),
       game_seconds_remaining = if_else(qtr <= 2, half_seconds_remaining + 1800, half_seconds_remaining),
       model_roof = roof,
+      # for now, assume that people are using the calculator for 2018 to present
       era = 3,
       era3 = 0,
       era4 = 1,
@@ -83,6 +86,9 @@ flip_team <- function(df) {
       # run off 6 seconds
       half_seconds_remaining = half_seconds_remaining - 6,
       game_seconds_remaining = game_seconds_remaining - 6,
+      # don't let seconds go negative
+      half_seconds_remaining = if_else(half_seconds_remaining < 0, 0, half_seconds_remaining),
+      game_seconds_remaining = if_else(game_seconds_remaining < 0, 0, game_seconds_remaining),
       # flip receive_2h_ko var
       receive_2h_ko = case_when(
         qtr <= 2 & receive_2h_ko == 0 ~ 1,
@@ -95,16 +101,19 @@ flip_team <- function(df) {
   
 }
 
+# function to get WP for field goal attempt
 get_fg_wp <- function(df) {
   
   # probability field goal is made
   fg_prob <- as.numeric(mgcv::predict.bam(fg_model, newdata = df, type="response"))
+  # if they attempt fg on own side of the field, they're not gonna make it
   fg_prob <- if_else(df$yardline_100 > 50, 0, fg_prob)
   
   # win probability of kicking team if field goal is made
   fg_make_wp <- 
     1 - df %>%
     flip_team() %>%
+    # win prob after receiving kickoff for touchback and other team has 3 more points
     mutate(
       yardline_100 = 75,
       score_differential = score_differential - 3
@@ -113,47 +122,37 @@ get_fg_wp <- function(df) {
     nflfastR::calculate_win_probability() %>%
     pull(vegas_wp)
   
+  # win probability of kicking team if field goal is missed
   fg_miss_wp <- 
     1 - df %>%
     flip_team() %>%
     mutate(
       yardline_100 = (100 - yardline_100) - 8,
-      # yardline_100 can't be bigger than 80
+      # yardline_100 can't be bigger than 80 due to some weird nfl rule
       yardline_100 = if_else(yardline_100 > 80, 80, yardline_100)
     ) %>%
     nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
     pull(vegas_wp)
   
+  # FG win prob is weighted avg of make and miss WPs
   fg_wp <- fg_prob * fg_make_wp + (1 - fg_prob) * fg_miss_wp
   
+  # bind up the probs to return for table
   results <- list(fg_wp, fg_prob, fg_miss_wp, fg_make_wp)
-  
-  # message(glue::glue(
-  #   "
-  #   --------
-  #   KICK FIELD GOAL RESULTS
-  #   --------
-  #   FG make prob: {round(fg_prob, 2)}
-  #   
-  #   FG miss WP: {round(fg_miss_wp, 2)}
-  #   FG make WP: {round(fg_make_wp, 2)}
-  #   --------
-  #   FG WP: {round(fg_wp, 2)}
-  #   "
-  # ))
   
   return(results)
 }
 
+# function for punt wp
 get_punt_wp <- function(df, punt_df) {
   
+  # get the distribution at a yard line from punt data
   punt_probs <- punt_df %>%
     filter(yardline_100 == df$yardline_100) %>%
     select(yardline_after, pct)
   
   if (nrow(punt_probs) > 0) {
-    
     
     # get punt df
     probs <- punt_probs %>%
@@ -162,8 +161,8 @@ get_punt_wp <- function(df, punt_df) {
       mutate(
         yardline_100 = 100 - yardline_after,
         
-        # deal with punt return TD
-        # we want punting team to be receiving a kickoff
+        # deal with punt return TD (yardline_after == 100)
+        # we want punting team to be receiving a kickoff so have to flip everything back
         posteam = if_else(yardline_after == 100, df$posteam, posteam),
         yardline_100 = if_else(yardline_after == 100, as.integer(75), as.integer(yardline_100)),
         posteam_timeouts_remaining = dplyr::if_else(yardline_after == 100,
@@ -188,6 +187,15 @@ get_punt_wp <- function(df, punt_df) {
         # for the punt return TD case
         vegas_wp = if_else(yardline_after == 100, 1 - vegas_wp, vegas_wp),
         
+        # fill in end of game situation when team can kneel out clock
+        # discourages punting when the other team can end the game
+        vegas_wp = case_when(
+          score_differential > 0 & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 1,
+          score_differential > 0 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 1,
+          score_differential > 0 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
+          TRUE ~ vegas_wp
+        ),
+        
         wt_wp = pct * vegas_wp
       ) %>%
       summarize(wp = sum(wt_wp)) %>%
@@ -198,19 +206,19 @@ get_punt_wp <- function(df, punt_df) {
     return(NA_real_)
   }
   
-  
 }
 
-
+# function for go for it WP
 get_go_wp <- function(df) {
   
-  
+  # stuff in the model
   data <- df %>%
     select(
       down,    ydstogo,     yardline_100,  era3,     era4,     outdoors, 
       retractable,  dome,    posteam_spread, total_line,  posteam_total 
     )
   
+  # get model output from situation
   preds <- stats::predict(
     fd_model,
     as.matrix(data)
@@ -220,55 +228,71 @@ get_go_wp <- function(df) {
     bind_cols(df[rep(1, 76), ]) %>%
     mutate(
       gain = -10:65,
+      # if predicted gain is more than possible, call it a TD
       gain = if_else(gain > yardline_100, as.integer(yardline_100), as.integer(gain))
     ) %>%
+    
+    # this step is to combine all the TD probs into one (for gains longer than possible)
     group_by(gain) %>%
     mutate(prob = sum(prob)) %>%
     dplyr::slice(1) %>%
     ungroup() %>%
+    
+    # update situation based on play result
     mutate(
       yardline_100 = yardline_100 - gain,
       posteam_timeouts_pre = posteam_timeouts_remaining,
       defeam_timeouts_pre = defteam_timeouts_remaining,
       turnover = dplyr::if_else(gain < ydstogo, as.integer(1), as.integer(0)),
       down = 1,
-      # if now goal to go, use yardline, otherwise it's 1st and 10 either way
+      # if now goal to go, use yardline for yards to go, otherwise it's 1st and 10 either way
       ydstogo = dplyr::if_else(yardline_100 < 10, as.integer(yardline_100), as.integer(10)),
-      # possession change if 4th down failed
-      # flip yardline_100, timeouts for turnovers
-      yardline_100 = dplyr::if_else(.data$turnover == 1, as.integer(100 - .data$yardline_100), as.integer(.data$yardline_100)),
-      posteam_timeouts_remaining = dplyr::if_else(.data$turnover == 1 | yardline_100 == 0,
-                                                  .data$defeam_timeouts_pre,
-                                                  .data$posteam_timeouts_pre),
-      defteam_timeouts_remaining = dplyr::if_else(.data$turnover == 1 | yardline_100 == 0,
-                                                  .data$posteam_timeouts_pre,
-                                                  .data$defeam_timeouts_pre),
+      
+      # possession change if 4th down failed or touchodwn
+      # flip yardline_100, timeouts, and score for turnovers
+      yardline_100 = dplyr::if_else(turnover == 1, as.integer(100 - yardline_100), as.integer(yardline_100)),
+      posteam_timeouts_remaining = dplyr::if_else(turnover == 1 | yardline_100 == 0,
+                                                  defeam_timeouts_pre,
+                                                  posteam_timeouts_pre),
+      defteam_timeouts_remaining = dplyr::if_else(turnover == 1 | yardline_100 == 0,
+                                                  posteam_timeouts_pre,
+                                                  defeam_timeouts_pre),
+      
+      # swap score diff if turnover on downs. we deal with touchdown score diff below
       score_differential = if_else(turnover == 1, -score_differential, score_differential),
+      
+      # run off 6 seconds
       half_seconds_remaining = half_seconds_remaining - 6,
       game_seconds_remaining = game_seconds_remaining - 6,
-      # additional runoff after successful non-td conversion
+      half_seconds_remaining = if_else(half_seconds_remaining < 0, 0, half_seconds_remaining),
+      game_seconds_remaining = if_else(game_seconds_remaining < 0, 0, game_seconds_remaining),
+      
+      # additional runoff after successful non-td conversion (entered from user input)
       half_seconds_remaining = if_else(turnover == 0 & df$yardline_100 > gain, half_seconds_remaining - df$runoff, half_seconds_remaining),
       game_seconds_remaining = if_else(turnover == 0 & df$yardline_100 > gain, game_seconds_remaining - df$runoff, game_seconds_remaining),
-      # flip receive_2h_ko var
+      
+      # flip receive_2h_ko var if turnover or touchdown
       receive_2h_ko = case_when(
         qtr <= 2 & receive_2h_ko == 0 & (yardline_100 == 0 | turnover == 1) ~ 1,
         qtr <= 2 & receive_2h_ko == 1 & (yardline_100 == 0 | turnover == 1) ~ 0,
         TRUE ~ receive_2h_ko
       ),
-      # switch posteam
+      # switch posteam if turnover or touchdown
       posteam = case_when(
         home_team == posteam & (turnover == 1 | yardline_100 == 0) ~ away_team, 
         away_team == posteam & (turnover == 1 | yardline_100 == 0) ~ home_team,
         TRUE ~ posteam
       ),
-      # deal with touchdown
+      
+      # deal with touchdown: swap score diff and take off 7 points
       score_differential = if_else(yardline_100 == 0, as.integer(-score_differential - 7), as.integer(score_differential)),
+      # assume touchback after kick
       yardline_100 = if_else(yardline_100 == 0, as.integer(75), as.integer(yardline_100))
     ) %>%
     nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
     mutate(
-      # flip for possession change
+      # flip for possession change (turnover or td)
       vegas_wp = if_else(posteam != df$posteam, 1 - vegas_wp, vegas_wp),
       # fill in end of game situation when team can kneel out clock
       vegas_wp = case_when(
@@ -280,8 +304,10 @@ get_go_wp <- function(df) {
     ) %>%
     mutate(wt_wp = prob * vegas_wp) 
   
+  # for debugging shiny app
   # global_df <<- preds
   
+  # gather the probabilities
   report <- preds %>%
     mutate(fd = if_else(gain < df$ydstogo, 0, 1)) %>%
     group_by(fd) %>%
@@ -299,20 +325,7 @@ get_go_wp <- function(df) {
   wp_succeed <- report %>% filter(fd == 1) %>% pull(wp)
   wp_go <- preds %>% summarize(wp = sum(wt_wp)) %>% pull(wp)
   
-  # message(glue::glue(
-  #   "
-  #   --------
-  #   GO FOR IT RESULTS
-  #   --------
-  #   First down prob: {first_down_prob %>% round(2)}
-  #   
-  #   WP fail: {wp_fail %>% round(2)}
-  #   WP succeed: {wp_succeed %>% round(2)}
-  #   --------
-  #   Go WP: {wp_go %>% round(2)}
-  #   "
-  # ))
-  
+  # return for table
   results <- list(
     wp_go,
     first_down_prob,
@@ -324,16 +337,20 @@ get_go_wp <- function(df) {
 }
 
 
+# get the numbers that go into the table
+# this is a separate function in case one wants the actual numbers
 make_table_data <- function(current_situation, punt_df) {
   
-  
+  # get punt wp numbers
   x <- get_punt_wp(current_situation, punt_df)
   
+  # get fg wp numbers
   y <- get_fg_wp(current_situation)
   
+  # get go wp numbers
   z <- get_go_wp(current_situation)
   
-  
+  # idk it works
   go <- do.call(cbind, z) %>%
     as_tibble(column_name = "V1") %>%
     dplyr::rename(
@@ -379,11 +396,13 @@ make_table_data <- function(current_situation, punt_df) {
       success_wp = 100 * success_wp
     )
   
-  global_data <<- for_return
+  # more debugging
+  # global_data <<- for_return
   
   return(for_return)
 }
 
+# make the actual table given the numbers
 make_table <- function(df, current_situation) {
 
   df %>%

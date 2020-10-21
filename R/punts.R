@@ -2,15 +2,19 @@ library(tidyverse)
 library(viridis)
 options(scipen = 999999)
 
+# using more seasons for the punt model to help smooth out blocks/td returns some
 seasons <- 2010:2019
 pbp <- purrr::map_df(seasons, function(x) {
   readRDS(
     url(
       glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_{x}.rds")
     )
-  ) %>% filter(play_type == "punt")
+  ) %>% filter(play_type_nfl == "PUNT")
 })
 
+# thank you to Thomas Mock for the function
+# https://themockup.blog/posts/2020-08-28-heatmaps-in-ggplot2/
+# maybe there's a better way to do this but calling it good enough for now
 get_density <- function(x, y, ...) {
   density_out <- MASS::kde2d(x, y, ...)
   int_x <- findInterval(x, density_out$x)
@@ -19,6 +23,7 @@ get_density <- function(x, y, ...) {
   return(density_out$z[comb_int])
 }
 
+# figure out before and after of each punt
 points <- pbp %>%
   select(desc, yardline_100, kick_distance, return_yards) %>%
   mutate(
@@ -42,15 +47,6 @@ points <- pbp %>%
   select(desc, yardline_100, yardline_after, blocked, return_td)
 
 points
-
-# show the data first
-density_map_all <- points %>%
-  mutate(density = get_density(yardline_100, yardline_after, n = 100))
-
-density_map_all %>% 
-  ggplot(aes(x = yardline_100, y = yardline_after, color = density)) +
-  geom_point(alpha = 0.2) +
-  scale_color_gradient(low = "red", high = "yellow")
 
 # first, bin by yardline to get blocked and return TD pct
 # another way to do this would be a smoother but these are so rare
@@ -94,23 +90,20 @@ return_tds <- outliers %>%
 
 blocks <- outliers %>%
   mutate(
+    # not used for anything except to pick these out later
     yardline_after = 999,
     density = bin_td_pct
   ) %>%
   select(yardline_100, yardline_after, density) %>%
   filter(density > 0)
 
-# show the data first
+# get density excluding blocks and returns. will add those later
 density_map_normal <- points %>%
   filter(blocked == 0 & return_td == 0) %>%
   select(yardline_100, yardline_after) %>%
   mutate(density = get_density(yardline_100, yardline_after, n = 100))
 
-density_map_normal %>% 
-  ggplot(aes(x = yardline_100, y = yardline_after, color = density)) +
-  geom_point(alpha = 0.2) +
-  scale_color_gradient(low = "red", high = "yellow")
-
+# get final percentages
 density_map_normal %>%
   group_by(yardline_100, yardline_after) %>%
   dplyr::slice(1) %>%
@@ -139,4 +132,29 @@ density_map_normal %>%
   filter(yardline_100 > 30) %>%
   saveRDS('data/punt_data.rds')
 
+
+# **************************************************************************************
+# field goals
+seasons <- 2014:2019
+
+pbp <- purrr::map_df(seasons, function(x) {
+  readRDS(
+    url(
+      glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_{x}.rds")
+    )
+  ) %>%
+    filter(
+      play_type_nfl == "FIELD_GOAL"
+    )
+}) %>%
+  mutate(
+    roof = if_else(roof %in% c("open", "closed"), "retractable", roof),
+    model_roof = as.factor(roof)
+  )
+
+#estimate model
+fg_model <- mgcv::bam(sp ~ s(yardline_100, by = interaction(model_roof)) + model_roof,
+                      data = pbp, family = "binomial")
+
+save(fg_model, file = 'data/fg_model.Rdata')
 
