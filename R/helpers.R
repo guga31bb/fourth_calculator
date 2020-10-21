@@ -120,6 +120,18 @@ get_fg_wp <- function(df) {
     ) %>%
     nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
+    mutate(
+      
+      # fill in end of game situation when team can kneel out clock
+      # discourages punting when the other team can end the game
+      vegas_wp = case_when(
+        score_differential > 0 & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 1,
+        score_differential > 0 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 1,
+        score_differential > 0 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
+        TRUE ~ vegas_wp
+      )
+      
+    ) %>%
     pull(vegas_wp)
   
   # win probability of kicking team if field goal is missed
@@ -133,6 +145,18 @@ get_fg_wp <- function(df) {
     ) %>%
     nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
+    mutate(
+      
+      # fill in end of game situation when team can kneel out clock
+      # discourages punting when the other team can end the game
+      vegas_wp = case_when(
+        score_differential > 0 & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 1,
+        score_differential > 0 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 1,
+        score_differential > 0 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
+        TRUE ~ vegas_wp
+      )
+      
+    ) %>%
     pull(vegas_wp)
   
   # FG win prob is weighted avg of make and miss WPs
