@@ -1,5 +1,5 @@
 library(tidyverse)
-
+library(tidymodels)
 # for getting data ready for the model
 source('https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R')
 
@@ -30,6 +30,7 @@ model_vars <- pbp %>%
            # we need a way to account for defensive penalties that give auto first downs
            # we're saying here that a penalty that gives a first down goes for the yards to go
            # unless the actual penalty yardage is higher
+           
            # the draw back is that a defensive holding on eg 4th and 8 is coded as an 8 yard gain
            # but the alternative is to estimate a separate model for penalties and that is too much
            case_when(
@@ -66,78 +67,91 @@ set.seed(2013)
 
 full_train = xgboost::xgb.DMatrix(model.matrix(~.+0, data = model_vars %>% dplyr::select(-label)), label = as.integer(model_vars$label))
 
-#params
-nrounds = 2000
+nrounds = 5000
 
-x = c(2) #max depth
-y = c(.01) #something else to tune
+grid <- grid_latin_hypercube(
+  finalize(mtry(), model_vars),
+  min_n(),
+  tree_depth(),
+  learn_rate(),
+  loss_reduction(),
+  sample_size = sample_prop(),
+  size = 20
+)
 
-search <- map_df(cross2(x, y), function(x) {
+grid <- grid %>%
+  mutate(
+    # it was making dumb learn rates
+    learn_rate = .025 + .1 * ((1 : nrow(grid)) / nrow(grid)),
+    # has to be between 0 and 1
+    mtry = mtry / length(model_vars)
+  )
+
+grid
+
+get_metrics <- function(df, row = 1) {
   
-  depth = x[[1]]
-  eta = x[[2]]
-  
-  print(message(glue::glue('max depth {depth} and eta {eta}')))
+  # testing only
+  # df <- grid %>% dplyr::slice(1)
   
   params <-
     list(
       booster = "gbtree",
       objective = "multi:softprob",
-      eval_metric = c("merror", "mlogloss"),
+      eval_metric = c("mlogloss"),
       num_class = 76,
-      eta = eta,
-      gamma = 2,
-      subsample=0.8,
-      colsample_bytree=0.8,
-      max_depth = 2,
-      min_child_weight = 0.8
+      eta = df$learn_rate,
+      gamma = df$loss_reduction,
+      subsample= df$sample_size,
+      colsample_bytree= df$mtry,
+      max_depth = df$tree_depth,
+      min_child_weight = df$min_n
     )
   
-  #train
-  fd_cv_model <- xgboost::xgb.cv(data = full_train, params = params, nrounds = nrounds,
-                                 nfold = 10, metrics = list("merror", "mlogloss"),
-                                 early_stopping_rounds = 5, print_every_n = 10)
+  # tuning with cv
+  fd_model <- xgboost::xgb.cv(data = full_train, params = params, nrounds = nrounds,
+                                 nfold = 5, metrics = list("mlogloss"),
+                                 early_stopping_rounds = 10, print_every_n = 10)
   
-  iter = fd_cv_model$best_iteration
+  output <- params
+  output$iter = fd_model$best_iteration
+  output$logloss = fd_model$evaluation_log[output$iter]$test_mlogloss_mean
+  output$error = fd_model$evaluation_log[output$iter]$test_merror_mean
   
-  result <- data.frame(
-    'eta' = eta,
-    'iter' = iter,
-    'logloss' = fd_cv_model$evaluation_log[iter]$test_mlogloss_mean,
-    'error' = fd_cv_model$evaluation_log[iter]$test_merror_mean,
-    'gamma' = 2,
-    'max_depth' = 2,
-    'min_child_weight' = 0.8,
-    'subsample' = 0.8,
-    'colsample' = 0.8
-  ) %>%
-    as_tibble()
+  this_param <- bind_rows(output)
   
-  return(result)
+  if (row == 1) {
+    saveRDS(this_param, "data/modeling.rds")
+  } else {
+    prev <- readRDS("data/modeling.rds")
+    for_save <- bind_rows(prev, this_param)
+    saveRDS(for_save, "data/modeling.rds")
+  }
+  
+  return(this_param)
+  
+}
+
+results <- map_df(1 : nrow(grid), function(x) {
+  
+  message(glue::glue("Row {x}"))
+  get_metrics(grid %>% dplyr::slice(x), row = x)
   
 })
 
+# plot
+results %>%
+  select(logloss, eta, gamma, subsample, colsample_bytree, max_depth, min_child_weight) %>%
+  pivot_longer(eta:min_child_weight,
+               values_to = "value",
+               names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, logloss, color = parameter)) +
+  geom_point(alpha = 0.8, show.legend = FALSE, size = 3) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "logloss") +
+  theme_minimal()
 
-search %>%
-  arrange(logloss) 
-
-
-# best
-best <- search %>% 
-  arrange(logloss) %>%
-  dplyr::slice(1)
-
-message(
-  glue::glue("
-  merror: {best$error}
-  mloglos: {best$logloss}
-  iter: {best$iter}
-  eta: {best$eta}
-  gamma: {best$gamma}
-  depth: {best$max_depth}
-  weight: {best$min_child_weight}
-             ")
-)
 
 # [1124] test-merror:0.676584+0.008136	test-mlogloss:2.858089+0.027665
 
