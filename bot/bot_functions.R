@@ -154,11 +154,15 @@ tweet_play <- function(df) {
   text <- 
     glue::glue(
       "
+  {df$away_team} @ {df$home_team}
+  
   {posteam} has 4th & {df$ydstogo}, {df$yardline_100} yards from end zone
                
   Correct choice: {choice} 
   
   Confidence level: {confidence}, difference = {round(diff, 1)}%
+  
+  #{df$away_team}v{df$home_team}bot
   
   ")
   

@@ -31,10 +31,10 @@ live_games <- readRDS(url(
 # live_games <- readRDS(url(
 #   "http://www.habitatring.com/games_alt.rds"
 #   # "https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"
-# )) %>% 
+# )) %>%
 #   dplyr::filter(
 #     season == 2020,
-#     week == 7,
+#     week == 6,
 #     !is.na(result)
 #   ) %>%
 #   head(2) %>%
