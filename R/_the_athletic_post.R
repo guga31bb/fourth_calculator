@@ -149,7 +149,6 @@ xgboost::xgb.ggplot.importance(importance_matrix = importance)
 
 ggsave('figures/go.png', dpi=600)
 
-
 readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
   filter(week == 1, season == 2020, home_team == "ATL") %>%
   select(game_id, spread_line, total_line, roof) %>%
@@ -160,36 +159,28 @@ readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw
          away_total = (total_line - spread_line) / 2,
          posteam_total = if_else(posteam == home_team, home_total, away_total),
          posteam_spread = dplyr::if_else(posteam == home_team, spread_line, -1 * spread_line)
-         )
+  )
 
-
-df <- tibble::tibble(
-  "down" = 4,
-  "ydstogo" = 5,
-  "yardline_100" = 38,
-  "era3" = 0,
-  "era4" = 1,
-  "outdoors" = 0,
-  "retractable" = 1,
-  "dome" = 0,
-  "posteam_spread" = -1,
-  "total_line" = 49.5,
-  "posteam_total" = 24.25,
-  "posteam_timeouts_remaining" = 3,
-  "defteam_timeouts_remaining" = 3,
-  "score_differential" = 2,
-  "posteam" = "SEA",
-  "home_team" = "ATL",
-  "away_team" = "SEA",
-  "half_seconds_remaining" = 589,
-  "game_seconds_remaining" = 589,
-  "receive_2h_ko" = 0,
-  "runoff" = 0,
-  "qtr" = 3,
-  "season" = 2020,
-  "roof" = "retractable",
-  "spread_line" = 1
-)
+df <- readRDS(url("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2020.rds")) %>%
+  filter(week == 1, posteam == "SEA", down == 4, ydstogo == 5, yardline_100 == 38) %>%
+  mutate(
+    roof = if_else(roof == "open" | roof == "closed" | is.na(roof), "retractable", roof),
+    receive_2h_ko = 0,
+    model_roof = roof,
+    # for now, assume that people are using the calculator for 2018 to present
+    era = 3,
+    era3 = 0,
+    era4 = 1,
+    posteam_spread = if_else(posteam == home_team, spread_line, -spread_line),
+    home_total = (total_line + spread_line) / 2,
+    away_total = (total_line - spread_line) / 2,
+    posteam_total = if_else(posteam == home_team, home_total, away_total),
+    posteam_spread = dplyr::if_else(posteam == home_team, spread_line, -1 * spread_line),
+    retractable = dplyr::if_else(model_roof == 'retractable', 1, 0),
+    dome = dplyr::if_else(model_roof == 'dome', 1, 0),
+    outdoors = dplyr::if_else(model_roof == 'outdoors', 1, 0)
+    )
+  
 
 data <- df %>%
   select(
@@ -276,10 +267,56 @@ preds <- stats::predict(
   ) %>%
   ungroup()
 
+# wp for certain outcomes
 preds %>%
-  filter(between(gain, 2, 5)) %>%
+  filter(between(gain, 0, 5) | gain == 38) %>%
   select(gain, prob, vegas_wp)
 
+
+# dk play punt outcomes
+punt_probs <- punt_df %>%
+  filter(yardline_100 == df$yardline_100) %>%
+  select(yardline_after, pct)
+
+
+# get punt df
+probs <- punt_probs %>%
+  bind_cols(df[rep(1, nrow(punt_probs)), ]) %>%
+  flip_team() %>%
+  mutate(
+    yardline_100 = 100 - yardline_after,
+    
+    # deal with punt return TD (yardline_after == 100)
+    # we want punting team to be receiving a kickoff so have to flip everything back
+    posteam = if_else(yardline_after == 100, df$posteam, posteam),
+    yardline_100 = if_else(yardline_after == 100, as.integer(75), as.integer(yardline_100)),
+    posteam_timeouts_remaining = dplyr::if_else(yardline_after == 100,
+                                                df$posteam_timeouts_remaining,
+                                                posteam_timeouts_remaining),
+    defteam_timeouts_remaining = dplyr::if_else(yardline_after == 100,
+                                                df$defteam_timeouts_remaining,
+                                                defteam_timeouts_remaining),
+    score_differential = if_else(yardline_after == 100, as.integer(-score_differential - 7), as.integer(score_differential)),
+    receive_2h_ko = case_when(
+      qtr <= 2 & receive_2h_ko == 0 & (yardline_after == 100) ~ 1,
+      qtr <= 2 & receive_2h_ko == 1 & (yardline_after == 100) ~ 0,
+      TRUE ~ receive_2h_ko
+    )
+  )
+
+# have to flip bc other team
+probs %>%
+  select(-vegas_wp, -ep) %>%
+  nflfastR::calculate_expected_points() %>%
+  nflfastR::calculate_win_probability() %>%
+  mutate(
+    # for the punt return TD case
+    vegas_wp = if_else(yardline_after == 100, 1 - vegas_wp, vegas_wp)
+  ) %>%
+  filter(yardline_100 %in% c(99, 98, 95, 90, 80)) %>%
+  select(yardline_100, pct, vegas_wp)
+
+get_punt_wp(df, punt_df)
 
 # **************************************************************************************
 # get list of plays
@@ -289,11 +326,12 @@ games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/game
   mutate(game_type = if_else(game_type == "REG", "reg", "post"))
 
 # get data
+# pbp <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2016.rds")))
 pbp <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2020.rds")))
 
 # some prep
 plays <- pbp %>%
-  filter(down == 4, vegas_wp > .05, vegas_wp < .95) %>%
+  filter(down == 4, vegas_wp > .05, vegas_wp < .95, game_seconds_remaining > 60, week <= 7) %>%
   dplyr::group_by(game_id) %>%
   dplyr::mutate(
     receive_2h_ko = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0)
@@ -318,7 +356,7 @@ get_probs <- function(p, games) {
     'home_opening_kickoff' = p$receive_2h_ko,
     'score_differential' = p$score_differential,
     'runoff' = 0,
-    'yr' = 2020,
+    'yr' = p$season,
     "desc" = p$desc,
     'play_type' = p$play_type_nfl,
     "type" = if_else(p$week <= 17, "reg", "post")
@@ -346,6 +384,7 @@ library(future)
 future::plan(multisession)
 
 fourth_downs <- furrr::future_map_dfr(1 : nrow(plays), function(x) {
+  # message(glue::glue("game {plays %>% dplyr::slice(x) %>% pull(game_id)}"))
   get_probs(plays %>% dplyr::slice(x), games)
 })
 
@@ -379,14 +418,15 @@ cleaned <- fourth_downs %>%
 
 t <- cleaned %>%
   filter(
-    play_type != "PENALTY",
-    go_boost > 1 | go_boost < -1
+    play_type != "PENALTY"
+    # go_boost > 1 | go_boost < -1
   ) %>%
   mutate(type = case_when(
-    go_boost >= 4 ~ "Recommendation: definitely go for it",
-    go_boost > 1 & go_boost < 4 ~ "Recommendation: probably go for it",
-    go_boost < -1 & go_boost > -4 ~ "Recommendation: probably kick",
-    go_boost <= -4 ~ "Recommendation: definitely kick"
+    go_boost >= 4 ~ "Definitely go for it",
+    go_boost > 1 & go_boost < 4 ~ "Probably go for it",
+    go_boost >= -1 & go_boost <= 1 ~ "Toss-up",
+    go_boost < -1 & go_boost > -4 ~ "Probably kick",
+    go_boost <= -4 ~ "Definitely kick"
   )) %>%
   group_by(type) %>%
   summarize(go = mean(go), n = n()) %>%
@@ -395,7 +435,7 @@ t <- cleaned %>%
   mutate(go = 100 * go) %>%
   gt() %>%
   cols_label(
-    type = "",
+    type = "Recommendation",
     go = "Went for it %",
     n = "Plays"
   ) %>%
@@ -488,7 +528,21 @@ t <- cleaned %>%
     title = md(glue::glue("Worst kick decisions of 2020"))
   )
 
+t
+
 t %>% gtsave("figures/team_worst.png")
+
+cleaned %>%
+  filter(
+    play_type != "PENALTY",
+    go == 0
+  ) %>%
+  mutate(
+    defteam = if_else(posteam == home_team, away_team, home_team)
+  ) %>%
+  arrange(-go_boost) %>%
+  head(5) %>% 
+  select(game_id, url)
 
 
 # **************************************************************************************
@@ -556,5 +610,6 @@ probs %>%
       score_differential > 0 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
       TRUE ~ vegas_wp
     )
-    )
+    )  %>% select(yardline_after, pct, vegas_wp)
+
 
