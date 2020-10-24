@@ -328,11 +328,18 @@ get_go_wp <- function(df) {
     mutate(
       # flip for possession change (turnover or td)
       vegas_wp = if_else(posteam != df$posteam, 1 - vegas_wp, vegas_wp),
-      # fill in end of game situation when team can kneel out clock
+      # fill in end of game situation when team can kneel out clock after successful conversion
       vegas_wp = case_when(
         score_differential > 0 & turnover == 0 & df$yardline_100 > gain & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 1,
         score_differential > 0 & turnover == 0 & df$yardline_100 > gain & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 1,
         score_differential > 0 & turnover == 0 & df$yardline_100 > gain & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
+        TRUE ~ vegas_wp
+      ),
+      # fill in end of game situation when team can kneel out clock after failed attempt
+      vegas_wp = case_when(
+        score_differential > 0 & turnover == 1 & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 0,
+        score_differential > 0 & turnover == 1 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 0,
+        score_differential > 0 & turnover == 1 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 0,
         TRUE ~ vegas_wp
       )
     ) %>%

@@ -1,13 +1,7 @@
 library(rtweet)
 
-if (grepl("Documents",getwd())){
-  data_path <- "../"
-} else { ### server
-  data_path <- "/home/ben/data"
-}
-
-
 # get all the 4th downs for a game
+# with thanks to espn for the api
 get_data <- function(df) {
   
   espn_game_id <- df$espn
@@ -83,7 +77,7 @@ get_data <- function(df) {
       week = week,
       type = if_else(week <= 17, "reg", "post")
     ) %>%
-    filter(down == 4) %>%
+    filter(down == 4, time > 60) %>%
     group_by(qtr, time, ydstogo) %>%
     dplyr::slice(1) %>%
     ungroup() %>%
@@ -104,7 +98,7 @@ get_data <- function(df) {
       runoff,
       yr
     ) %>%
-    arrange(qtr, desc(time)) %>%
+    arrange(qtr, desc(time), ydstogo) %>%
     mutate(
       index = 1 : n(),
       game_id = df$game_id
