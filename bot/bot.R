@@ -28,21 +28,19 @@ live_games <- readRDS(url(
   dplyr::select(game_id, espn, home_team, away_team, week)
 
 # for testing
-live_games <- readRDS(url(
-  "http://www.habitatring.com/games_alt.rds"
-  # "https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"
-)) %>% 
-  dplyr::filter(
-    season == 2020,
-    week == 7,
-    !is.na(result)
-  ) %>%
-  head(2) %>%
-  dplyr::select(game_id, espn, home_team, away_team, week)
+# live_games <- readRDS(url(
+#   "http://www.habitatring.com/games_alt.rds"
+#   # "https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"
+# )) %>% 
+#   dplyr::filter(
+#     season == 2020,
+#     week == 7,
+#     !is.na(result)
+#   ) %>%
+#   head(2) %>%
+#   dplyr::select(game_id, espn, home_team, away_team, week)
 
 if (nrow(live_games) > 0) {
-  
-  source('R/helpers.R')
   
   # get list of old plays before we do anything
   old_plays <- readRDS("bot/old_plays.rds") %>%
@@ -66,10 +64,11 @@ if (nrow(live_games) > 0) {
   for_tweeting
   
   # for testing: limited to a few tweets
-  for_tweeting <- for_tweeting %>% head(5)
+  # for_tweeting <- for_tweeting %>% head(5)
   
   if (nrow(for_tweeting) > 0) {
     
+    source('R/helpers.R')
     library(rtweet)
     
     # do the thing
