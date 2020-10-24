@@ -42,10 +42,12 @@ live_games <- readRDS(url(
 
 if (nrow(live_games) > 0) {
   
+  source('R/helpers.R')
+  
   # get list of old plays before we do anything
   old_plays <- readRDS("bot/old_plays.rds") %>%
-    select(game_id, index) %>%
-    mutate(old = 1)
+    dplyr::select(game_id, index) %>%
+    dplyr::mutate(old = 1)
   
   # get updated plays from ongoing games
   plays <- map_df(1 : nrow(live_games), function(x) {
@@ -68,7 +70,6 @@ if (nrow(live_games) > 0) {
   
   if (nrow(for_tweeting) > 0) {
     
-    source('R/helpers.R')
     library(rtweet)
     
     # do the thing
