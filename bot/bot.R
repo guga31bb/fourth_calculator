@@ -34,7 +34,7 @@ live_games <- readRDS(url(
 )) %>% 
   dplyr::filter(
     season == 2020,
-    week == 3
+    week == 5
   ) %>%
   head(2) %>%
   dplyr::select(game_id, espn, home_team, away_team, week)
