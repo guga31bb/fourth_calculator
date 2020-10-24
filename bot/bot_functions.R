@@ -1,4 +1,4 @@
-library(rtweet)
+`%>%`<-magrittr::`%>%`
 
 # get all the 4th downs for a game
 # with thanks to espn for the api
@@ -13,11 +13,31 @@ get_data <- function(df) {
     httr::content(as = "text", encoding = "UTF-8") %>%
     jsonlite::fromJSON(flatten = TRUE) 
   
-  drives <- pbp$drives$previous
-  
+  # get plays out of the drives lists
+  # i think current drive duplicates a drive in previous drive so might be ok to cut this
+  if ("current" %in% names(pbp$drives) & "previous" %in% names(pbp$drives)) {
+    current_drive <- pbp$drives$current
+    current_drive <- current_drive[['plays']] %>% bind_rows() %>% as_tibble() %>% mutate(team.abbreviation = current_drive$team$abbreviation)
+    
+    previous_drives <- pbp$drives$previous
+    
+    drives <- bind_rows(
+      previous_drives %>% select(team.abbreviation, plays) %>% unnest(plays),
+      current_drive
+    )
+    } else if ("current" %in% names(pbp$drives)) {
+      current_drive <- pbp$drives$current
+      drives <- current_drive[['plays']] %>% bind_rows() %>% as_tibble() %>% mutate(team.abbreviation = current_drive$team$abbreviation)
+    } else {
+      previous_drives <- pbp$drives$previous
+      drives <- previous_drives %>% select(team.abbreviation, plays) %>% unnest(plays)
+    }
+
   plays <- drives %>%
-    select(team.abbreviation, plays) %>%
-    unnest(plays) %>%
+    group_by(id) %>%
+    dplyr::slice(1) %>%
+    ungroup() %>%
+    arrange(id) %>%
     janitor::clean_names() %>%
     dplyr::rename(
       posteam = team_abbreviation,
