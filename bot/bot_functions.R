@@ -139,9 +139,9 @@ tweet_play <- function(df) {
   choice <- tableData %>% dplyr::slice(1) %>% pull(choice)
   choice <- if_else(abs(diff) < 1, "Toss-up", choice)
   confidence <- case_when(
-    abs(diff) < 1 ~ "low",
-    abs(diff) >= 1 & abs(diff) < 3 ~ "medium",
-    abs(diff) >= 3 ~ "high"
+    abs(diff) < 1 ~ "LOW",
+    abs(diff) >= 1 & abs(diff) < 3 ~ "MEDIUM",
+    abs(diff) >= 3 ~ "HIGH"
   )
   
   posteam <- df$posteam
@@ -160,7 +160,7 @@ tweet_play <- function(df) {
                
   Correct choice: {choice} 
   
-  Confidence level: {confidence}, difference = {round(diff, 1)}%
+  Confidence level: {confidence} (+{round(diff, 1)} percentage points)
   
   #{df$away_team}v{df$home_team}bot
   
