@@ -34,7 +34,7 @@ live_games <- readRDS(url(
 )) %>% 
   dplyr::filter(
     season == 2020,
-    week == 5
+    week == 7
   ) %>%
   head(2) %>%
   dplyr::select(game_id, espn, home_team, away_team, week)
@@ -65,7 +65,7 @@ if (nrow(live_games) > 0) {
   for_tweeting
   
   # for testing: limited to a few tweets
-  for_tweeting <- for_tweeting %>% head(3)
+  for_tweeting <- for_tweeting %>% head(5)
   
   if (nrow(for_tweeting) > 0) {
     
