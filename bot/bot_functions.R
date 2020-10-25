@@ -54,6 +54,7 @@ get_data <- function(df) {
       away_team = away,
       posteam = case_when(
         posteam == "WSH" ~ "WAS",
+        posteam == "LAR" ~ "LA",
         TRUE ~ posteam
       ),
       defteam = if_else(posteam == home_team, away_team, home_team),
