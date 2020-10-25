@@ -29,7 +29,7 @@ live_games <- readRDS(url(
       current_hour == game_hour & current_minute >= game_minute + 5 ~ 1,
       TRUE ~ 0
     ),
-    espn = if_else(game_id == "2020_07_PIT_TEN", "401249063", espn)
+    espn = dplyr::if_else(game_id == "2020_07_PIT_TEN", "401249063", espn)
   ) %>%
   dplyr::filter(started == 1) %>%
   dplyr::select(game_id, espn, home_team, away_team, week)
