@@ -119,11 +119,18 @@ get_data <- function(df) {
       yr
     ) %>%
     arrange(qtr, desc(time), ydstogo) %>%
-    mutate(
-      index = 1 : n(),
-      game_id = df$game_id
-      ) %>%
-    return()
+    mutate(game_id = df$game_id)
+  
+  if (nrow(plays) > 0) {
+    plays <- plays %>%
+      mutate(
+        index = 1 : n()
+      ) 
+  } else {
+    plays$index <- NA_real_
+  }
+  
+    return(plays)
 }
 
 
