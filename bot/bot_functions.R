@@ -102,7 +102,7 @@ get_data <- function(df) {
       week = week,
       type = if_else(week <= 17, "reg", "post")
     ) %>%
-    filter(down == 4, time > 60) %>%
+    filter(down == 4, !(time < 30 & qtr %in% c(2, 4))) %>%
     group_by(qtr, time, ydstogo) %>%
     dplyr::slice(1) %>%
     ungroup() %>%
