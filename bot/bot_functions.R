@@ -76,6 +76,7 @@ get_data <- function(df) {
       away_timeouts_remaining = 3
     ) %>%
     dplyr::group_by(half) %>%
+    arrange(id) %>%
     dplyr::mutate(
       total_home_timeouts_used = dplyr::if_else(cumsum(home_timeout_used) > 3, 3, cumsum(home_timeout_used)),
       total_away_timeouts_used = dplyr::if_else(cumsum(away_timeout_used) > 3, 3, cumsum(away_timeout_used))
