@@ -52,6 +52,10 @@ get_data <- function(df) {
     dplyr::mutate(
       home_team = home,
       away_team = away,
+      posteam = case_when(
+        posteam == "WSH" ~ "WAS",
+        TRUE ~ posteam
+      ),
       defteam = if_else(posteam == home_team, away_team, home_team),
       half = if_else(qtr <= 2, 1, 2),
       mins = if_else(nchar(time) == 5, substr(time, 1, 2), substr(time, 1, 1)),
@@ -119,7 +123,9 @@ get_data <- function(df) {
       yr
     ) %>%
     arrange(qtr, desc(time), ydstogo) %>%
-    mutate(game_id = df$game_id)
+    mutate(
+      game_id = df$game_id
+      )
   
   if (nrow(plays) > 0) {
     plays <- plays %>%
