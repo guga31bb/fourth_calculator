@@ -95,6 +95,8 @@ get_data <- function(df) {
         away_timeouts_remaining
       ),
       time = 60 * as.integer(mins) + as.integer(secs),
+      home_score = dplyr::lag(home_score),
+      away_score = dplyr::lag(away_score),
       score_differential = if_else(posteam == home_team, home_score - away_score, away_score - home_score),
       runoff = 0,
       yr = 2020,
