@@ -6,13 +6,19 @@ live_games <- readRDS(url(
   # "https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"
 )) %>% 
   dplyr::filter(
+    
+    # this probably isn't necessary but whatever
     season == 2020,
+    
     # hasn't finished yet
     is.na(result),
+    
     # happening today
     gameday == as.character(lubridate::today())
+    
     ) %>%
   dplyr::mutate(
+    # there's probably a better way to do this but it seems to work
     current_hour = lubridate::hour(lubridate::now()),
     current_minute = lubridate::minute(lubridate::now()),
     game_hour = as.integer(substr(gametime, 1, 2)),
@@ -20,11 +26,11 @@ live_games <- readRDS(url(
     # has already started
     started = dplyr::case_when(
       current_hour > game_hour ~ 1,
-      current_hour == game_hour & current_minute > game_minute + 5 ~ 1,
+      current_hour == game_hour & current_minute >= game_minute + 5 ~ 1,
       TRUE ~ 0
     )
   ) %>%
-  dplyr::filter(started == 1) %>%
+  dplyr::filter(started == 1, game_id !="2020_07_PIT_TEN") %>%
   dplyr::select(game_id, espn, home_team, away_team, week)
 
 # for testing
@@ -51,6 +57,7 @@ if (nrow(live_games) > 0) {
   
   # get updated plays from ongoing games
   plays <- map_df(1 : nrow(live_games), function(x) {
+    message(glue::glue("{x}: game {live_games %>% dplyr::slice(x) %>% pull(game_id)}"))
     get_data(live_games %>% dplyr::slice(x))
   })
   
