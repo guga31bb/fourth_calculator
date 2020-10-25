@@ -120,6 +120,9 @@ get_data <- function(df) {
       home_opening_kickoff,
       score_differential,
       runoff,
+      home_score,
+      away_score,
+      type_text,
       yr
     ) %>%
     arrange(qtr, desc(time), ydstogo) %>%
@@ -167,11 +170,11 @@ tweet_play <- function(df) {
   text <- 
     glue::glue(
       "
-  {df$away_team} @ {df$home_team}
+  {df$away_team} ({df$away_score}) @ {df$home_team} ({df$home_score})
   
   {posteam} has 4th & {df$ydstogo}, {df$yardline_100} yards from end zone
                
-  Correct choice: {choice} 
+  Correct choice: {choice}. Actual play: {df$type_text}
   
   Confidence level: {confidence} (+{round(diff, 1)} percentage points)
   
@@ -180,6 +183,7 @@ tweet_play <- function(df) {
   ")
   
   post_tweet(text, media = "bot/post.png")
+  # post_tweet(text)
   
 }
 
