@@ -86,6 +86,11 @@ get_data <- function(df) {
             defteam = if_else(posteam == home_team, away_team, home_team),
             half = if_else(qtr <= 2, 1, 2),
             timeout_team = stringr::str_extract(desc, "(?<=Timeout #[:digit:] by )[:upper:]{2,3}"),
+            timeout_team = case_when(
+              timeout_team == "WSH" ~ "WAS",
+              timeout_team == "LAR" ~ "LA",
+              TRUE ~ timeout_team
+            ),
             home_timeout_used = case_when(
               timeout_team == home_team ~ 1,
               timeout_team != home_team ~ 0,
