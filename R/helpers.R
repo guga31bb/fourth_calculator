@@ -1,5 +1,11 @@
-library(tidyverse)
-library(gt)
+suppressMessages(
+  library(tidyverse)
+)
+
+suppressMessages(
+  library(gt)
+)
+
 
 # for fg model
 load('data/fg_model.Rdata', .GlobalEnv)
@@ -116,8 +122,9 @@ get_fg_wp <- function(df) {
   
   # probability field goal is made
   fg_prob <- as.numeric(mgcv::predict.bam(fg_model, newdata = df, type="response"))
-  # if they attempt fg on own side of the field, they're not gonna make it
-  fg_prob <- if_else(df$yardline_100 > 50, 0, fg_prob)
+  # don't recommend kicking when fg is 60+ yards
+  # need a better way to deal with long attempts, especially indoors
+  fg_prob <- if_else(df$yardline_100 > 42, 0, fg_prob)
   
   # win probability of kicking team if field goal is made
   fg_make_wp <- 
