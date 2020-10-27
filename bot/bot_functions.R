@@ -175,6 +175,7 @@ get_data <- function(df) {
             )
           ) %>%
           select(
+            game_id,
             desc,
             type,
             qtr,
