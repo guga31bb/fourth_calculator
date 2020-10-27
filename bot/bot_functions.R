@@ -89,6 +89,10 @@ get_data <- function(df) {
             timeout_team = case_when(
               timeout_team == "WSH" ~ "WAS",
               timeout_team == "LAR" ~ "LA",
+              timeout_team == "ARZ" ~ "ARI",
+              timeout_team == "BLT" ~ "BAL",
+              timeout_team == "CLV" ~ "CLE",
+              timeout_team == "HST" ~ "HOU",
               TRUE ~ timeout_team
             ),
             home_timeout_used = case_when(
@@ -135,6 +139,7 @@ get_data <- function(df) {
             type = if_else(week <= 17, "reg", "post")
           ) %>%
           filter(
+            # testing. uncomment these
             down == 4, 
             !(time < 30 & qtr %in% c(2, 4)),
             is.na(timeout_team),
@@ -175,6 +180,7 @@ get_data <- function(df) {
             qtr,
             time,
             posteam,
+            timeout_team,
             away_team,
             home_team,
             yardline_100,
