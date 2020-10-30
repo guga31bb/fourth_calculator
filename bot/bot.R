@@ -78,7 +78,9 @@ if (nrow(live_games) > 0) {
   
   if (nrow(for_tweeting) > 0) {
     
-    library(rtweet)
+    suppressMessages(
+      library(rtweet)
+    )
     
     # do the thing
     for (x in 1 : nrow(for_tweeting)) {
