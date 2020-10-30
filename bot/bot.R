@@ -57,6 +57,7 @@ if (nrow(live_games) > 0) {
       dplyr::select(game_id, index) %>%
       dplyr::mutate(old = 1)
   } else {
+    # this is so we can remove the file if we want to start over
     old_plays <- tibble::tibble(
       "game_id" = as.character("XXXXXX"),
       "index" = as.integer(0),

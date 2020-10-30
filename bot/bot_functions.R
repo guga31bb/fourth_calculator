@@ -276,16 +276,37 @@ tweet_play <- function(df) {
   tableData <- make_table_data(fullInput, punt_df) %>%
     arrange(-choice_prob)
   
+  choice_emoji <- dplyr::case_when(
+    # football to punt
+    fullInput$type_text %in% c("Blocked Punt", "Punt") ~ "\U0001f3c8",
+    # field goal
+    fullInput$type_text %in% c("Field Goal Good", "Field Goal Missed") ~ "\U0001f945",
+    # go for it
+    fullInput$type_text %in% c("Pass Incompletion", "Pass Reception", "Passing Touchdown", "Rush", "Rushing Touchdown", "Sack") ~ "\U0001f449",
+    # penalty
+    fullInput$type_text %in% c("Penalty") ~ "\U0001f6A8",
+    TRUE ~ ""
+  )
+  
+
   wp1 <- tableData %>% dplyr::slice(1) %>% pull(choice_prob)
   wp2 <- tableData %>% dplyr::slice(2) %>% pull(choice_prob)
   
   diff <- wp1 - wp2
   choice <- tableData %>% dplyr::slice(1) %>% pull(choice)
   choice <- if_else(abs(diff) < 1, "Toss-up", choice)
+  
+  rec_emoji <- dplyr::case_when(
+    choice == "Go for it" ~ "\U0001f449",
+    choice == "Field goal attempt" ~ "\U0001f945",
+    choice == "Punt" ~ "\U0001f3c8",
+    choice == "Toss-up" ~ "\U0001f937"
+  )
+  
   confidence <- case_when(
-    abs(diff) < 1 ~ "LOW",
+    abs(diff) < 1 ~ "WEAK",
     abs(diff) >= 1 & abs(diff) < 3 ~ "MEDIUM",
-    abs(diff) >= 3 ~ "HIGH"
+    abs(diff) >= 3 ~ "STRONG"
   )
   position <- if_else(
     !is.na(df$yardline), 
@@ -306,8 +327,8 @@ tweet_play <- function(df) {
   ---> {df$away_team} ({df$away_score}) @ {df$home_team} ({df$home_score}) <---
   {posteam} has 4th & {df$ydstogo} {position}
                
-  Correct choice: {choice}. Actual play: {df$type_text}
-  Confidence level: {confidence} (+{round(diff, 1)} percentage points)
+  Recommendation ({confidence}): {rec_emoji} {choice} (+{round(diff, 1)} percentage points)
+  Actual play: {choice_emoji} {df$type_text}
   ")
   
   # don't post if every choice is < 1 or > 99
