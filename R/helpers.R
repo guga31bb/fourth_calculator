@@ -288,12 +288,12 @@ get_go_wp <- function(df) {
       defeam_timeouts_pre = defteam_timeouts_remaining,
       turnover = dplyr::if_else(gain < ydstogo, as.integer(1), as.integer(0)),
       down = 1,
-      # if now goal to go, use yardline for yards to go, otherwise it's 1st and 10 either way
-      ydstogo = dplyr::if_else(yardline_100 < 10, as.integer(yardline_100), as.integer(10)),
-      
       # possession change if 4th down failed or touchodwn
       # flip yardline_100, timeouts, and score for turnovers
       yardline_100 = dplyr::if_else(turnover == 1, as.integer(100 - yardline_100), as.integer(yardline_100)),
+      
+      # if now goal to go, use yardline for yards to go, otherwise it's 1st and 10 either way
+      ydstogo = dplyr::if_else(yardline_100 < 10, as.integer(yardline_100), as.integer(10)),
       posteam_timeouts_remaining = dplyr::if_else(turnover == 1 | yardline_100 == 0,
                                                   defeam_timeouts_pre,
                                                   posteam_timeouts_pre),
