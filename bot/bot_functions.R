@@ -280,7 +280,7 @@ tweet_play <- function(df) {
     # football to punt
     fullInput$type_text %in% c("Blocked Punt", "Punt") ~ "\U0001f3c8",
     # field goal
-    fullInput$type_text %in% c("Field Goal Good", "Field Goal Missed") ~ "\U0001f945",
+    fullInput$type_text %in% c("Field Goal Good", "Field Goal Missed") ~ "\U0001f9B5",
     # go for it
     fullInput$type_text %in% c("Pass Incompletion", "Pass Reception", "Passing Touchdown", "Rush", "Rushing Touchdown", "Sack") ~ "\U0001f449",
     # penalty
@@ -298,7 +298,7 @@ tweet_play <- function(df) {
   
   rec_emoji <- dplyr::case_when(
     choice == "Go for it" ~ "\U0001f449",
-    choice == "Field goal attempt" ~ "\U0001f945",
+    choice == "Field goal attempt" ~ "\U0001f9B5",
     choice == "Punt" ~ "\U0001f3c8",
     choice == "Toss-up" ~ "\U0001f937"
   )
