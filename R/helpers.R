@@ -400,31 +400,22 @@ make_table_data <- function(current_situation, punt_df) {
   # get go wp numbers
   z <- get_go_wp(current_situation)
   
-  # idk it works
-  go <- do.call(cbind, z) %>%
-    as_tibble(column_name = "V1") %>%
-    dplyr::rename(
-      choice_prob  = V1,
-      success_prob = V2,
-      fail_wp = V3,
-      success_wp = V4
-      ) %>%
-    mutate(
-    choice = "Go for it"
-    ) %>%
+  go <- tibble::tibble(
+    "choice_prob" = z[[1]],
+    "choice" = "Go for it",
+    "success_prob" = z[[2]],
+    "fail_wp" = z[[3]],
+    "success_wp" = z[[4]]
+  ) %>%
     select(choice, choice_prob, success_prob, fail_wp, success_wp)
   
-  fg <- do.call(cbind, y) %>%
-    as_tibble(column_name = "V1") %>%
-    dplyr::rename(
-      choice_prob  = V1,
-      success_prob = V2,
-      fail_wp = V3,
-      success_wp = V4
-    ) %>%
-    mutate(
-      choice = "Field goal attempt"
-    ) %>%
+  fg <- tibble::tibble(
+    "choice_prob" = y[[1]],
+    "choice" = "Field goal attempt",
+    "success_prob" = y[[2]],
+    "fail_wp" = y[[3]],
+    "success_wp" = y[[4]]
+  ) %>%
     select(choice, choice_prob, success_prob, fail_wp, success_wp)
   
   punt <- tibble::tibble(
