@@ -16,19 +16,21 @@ punt_df <- readRDS("data/punt_data.rds")
 # for go for it model
 load('data/fd_model.Rdata', .GlobalEnv)
 
-# load games file for getting game total, point spread, and roof
-games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
-  mutate(
-    game_type = if_else(game_type == "REG", "reg", "post"),
+suppressWarnings(
+  # load games file for getting game total, point spread, and roof
+  games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
+    mutate(
+      game_type = if_else(game_type == "REG", "reg", "post"),
     ) %>%
-  mutate_at(vars(home_team, away_team), funs(case_when(
-    . %in% "JAC" ~ "JAX",
-    . %in% "STL" ~ "LA",
-    . %in% "LAR" ~ "LA",
-    . %in% "SD" ~ "LAC",
-    . %in% "OAK" ~ "LV",
-    TRUE ~ .
-  )))
+    mutate_at(vars(home_team, away_team), funs(case_when(
+      . %in% "JAC" ~ "JAX",
+      . %in% "STL" ~ "LA",
+      . %in% "LAR" ~ "LA",
+      . %in% "SD" ~ "LAC",
+      . %in% "OAK" ~ "LV",
+      TRUE ~ .
+    )))
+)
 
 # data prep function
 prepare_df <- function(df, games) {
