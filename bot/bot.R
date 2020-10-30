@@ -52,9 +52,17 @@ if (nrow(live_games) > 0) {
   source('R/helpers.R')
   
   # get list of old plays before we do anything
-  old_plays <- readRDS("bot/old_plays.rds") %>%
-    dplyr::select(game_id, index) %>%
-    dplyr::mutate(old = 1)
+  if (file.exists("bot/old_plays.rds")) {
+    old_plays <- readRDS("bot/old_plays.rds") %>%
+      dplyr::select(game_id, index) %>%
+      dplyr::mutate(old = 1)
+  } else {
+    old_plays <- tibble::tibble(
+      "game_id" = as.character("XXXXXX"),
+      "index" = as.integer(0),
+      "old" = as.integer(1)
+    )
+  }
   
   # get updated plays from ongoing games
   plays <- map_df(1 : nrow(live_games), function(x) {
