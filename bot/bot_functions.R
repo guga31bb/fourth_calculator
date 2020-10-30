@@ -181,7 +181,7 @@ get_data <- function(df) {
             qtr,
             time,
             posteam,
-            timeout_team,
+            # timeout_team,
             away_team,
             home_team,
             yardline_100,
