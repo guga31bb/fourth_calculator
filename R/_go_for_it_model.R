@@ -28,11 +28,13 @@ model_vars <- pbp %>%
   mutate(yards_gained = 
            
            # we need a way to account for defensive penalties that give auto first downs
-           # we're saying here that a penalty that gives a first down goes for the yards to go
+           # hacky "solution" is saying here that a penalty that gives a first down goes for the yards to go
            # unless the actual penalty yardage is higher
            
-           # the draw back is that a defensive holding on eg 4th and 8 is coded as an 8 yard gain
-           # but the alternative is to estimate a separate model for penalties and that is too much
+           # the drawback is that a defensive holding on eg 4th and 8 is coded as an 8 yard gain
+           # the alternative is to estimate a separate model for penalties or have their own category
+           # but first down penalties on 4th and long are very rare:
+           # https://twitter.com/benbbaldwin/status/1322530446371074050
            case_when(
              first_down_penalty == 1 & penalty_yards < ydstogo ~ ydstogo, 
              first_down_penalty == 1 & penalty_yards >= ydstogo ~ penalty_yards, 
