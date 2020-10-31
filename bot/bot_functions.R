@@ -276,11 +276,15 @@ tweet_play <- function(df) {
   tableData <- make_table_data(fullInput, punt_df) %>%
     arrange(-choice_prob)
   
+  play_desc <- df$desc %>%
+    stringr::str_replace("\\([:digit:]*\\:[:digit:]+\\)\\s", "") %>%
+    substr(1, 80)
+  
   choice_emoji <- dplyr::case_when(
     # football to punt
-    fullInput$type_text %in% c("Blocked Punt", "Punt") ~ "\U0001f3c8",
+    fullInput$type_text %in% c("Blocked Punt", "Punt") ~ "\U0001f3c8\U0001f9B5",
     # field goal
-    fullInput$type_text %in% c("Field Goal Good", "Field Goal Missed") ~ "\U0001f9B5",
+    fullInput$type_text %in% c("Field Goal Good", "Field Goal Missed") ~ "\U0001f45F\U0001f3c8",
     # go for it
     fullInput$type_text %in% c("Pass Incompletion", "Pass Reception", "Passing Touchdown", "Rush", "Rushing Touchdown", "Sack") ~ "\U0001f449",
     # penalty
@@ -298,16 +302,18 @@ tweet_play <- function(df) {
   
   rec_emoji <- dplyr::case_when(
     choice == "Go for it" ~ "\U0001f449",
-    choice == "Field goal attempt" ~ "\U0001f9B5",
-    choice == "Punt" ~ "\U0001f3c8",
+    choice == "Field goal attempt" ~ "\U0001f45F\U0001f3c8",
+    choice == "Punt" ~ "\U0001f3c8\U0001f9B5",
     choice == "Toss-up" ~ "\U0001f937"
   )
   
   confidence <- case_when(
-    abs(diff) < 1 ~ "WEAK",
-    abs(diff) >= 1 & abs(diff) < 3 ~ "MEDIUM",
-    abs(diff) >= 3 ~ "STRONG"
+    abs(diff) < 1 ~ "",
+    abs(diff) >= 1 & abs(diff) < 3 ~ "(MEDIUM)",
+    abs(diff) >= 3 & abs(diff) <= 10 ~ "(STRONG)",
+    abs(diff) > 10 ~ "(VERY STRONG)"
   )
+  
   position <- if_else(
     !is.na(df$yardline), 
     glue::glue("at the {df$yardline}"),
@@ -327,9 +333,10 @@ tweet_play <- function(df) {
   ---> {df$away_team} ({df$away_score}) @ {df$home_team} ({df$home_score}) <---
   {posteam} has 4th & {df$ydstogo} {position}
                
-  Recommendation ({confidence}): {rec_emoji} {choice} (+{round(diff, 1)} percentage points)
-  Actual play: {choice_emoji} {df$type_text}
+  Recommendation {confidence}: {rec_emoji} {choice} (+{round(diff, 1)} WP)
+  Actual play: {choice_emoji} {play_desc}
   ")
+  
   
   # don't post if every choice is < 1 or > 99
   if (wp1 > 1 & wp2 > 1 & wp1 < 99 & wp2 < 99) {
