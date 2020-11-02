@@ -124,9 +124,14 @@ get_fg_wp <- function(df) {
   
   # probability field goal is made
   fg_prob <- as.numeric(mgcv::predict.bam(fg_model, newdata = df, type="response"))
-  # don't recommend kicking when fg is 60+ yards
-  # need a better way to deal with long attempts, especially indoors
+  
+  # don't recommend kicking when fg is over 60 yards
   fg_prob <- if_else(df$yardline_100 > 42, 0, fg_prob)
+  
+  # hacky way to not have crazy high probs for long kicks
+  # because the bot should be conservative about recommending kicks in this region
+  # for 56 through 60 yards
+  fg_prob <- if_else(df$yardline_100 >= 38 & df$yardline_100 <= 42, fg_prob * .9, fg_prob)
   
   # win probability of kicking team if field goal is made
   fg_make_wp <- 
