@@ -32,7 +32,7 @@ get_data <- function(df) {
         previous_drives <- pbp$drives$previous
         
         drives <- bind_rows(
-          previous_drives %>% select(team.abbreviation, plays) %>% unnest(plays),
+          previous_drives %>% dplyr::select(team.abbreviation, plays) %>% unnest(plays),
           current_drive
         )
       } else if ("current" %in% names(pbp$drives)) {
@@ -40,7 +40,7 @@ get_data <- function(df) {
         drives <- current_drive[['plays']] %>% bind_rows() %>% as_tibble() %>% mutate(team.abbreviation = current_drive$team$abbreviation)
       } else {
         previous_drives <- pbp$drives$previous
-        drives <- previous_drives %>% select(team.abbreviation, plays) %>% unnest(plays)
+        drives <- previous_drives %>% dplyr::select(team.abbreviation, plays) %>% unnest(plays)
       }
       
       suppressWarnings(
@@ -179,7 +179,6 @@ get_data <- function(df) {
             type = if_else(week <= 17, "reg", "post")
           ) %>%
           filter(
-            # testing. uncomment these
             down == 4, 
             !(time < 30 & qtr %in% c(2, 4)),
             is.na(timeout_team),
@@ -236,6 +235,15 @@ get_data <- function(df) {
             away_score,
             type_text,
             yr
+          ) %>%
+          # put in end of game conditions
+          dplyr::mutate(
+            # if there's a conversion with fewer than 5 minutes left and a lead, run off 40 seconds
+            runoff = if_else(between(time, 167, 300) & score_differential > 0 & qtr == 4, 40, runoff),
+            # if there's a conversion right before 2 minute warning, run down to 2 minute warning
+            runoff = if_else(between(time, 127, 166) & score_differential > 0 & qtr == 4, time - 120 - 6, runoff),
+            # if conversion after 2 minute warning, run down 40 seconds
+            runoff = if_else(time <= 120 & score_differential > 0 & qtr == 4, 40, runoff)
           )
       )
       
