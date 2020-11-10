@@ -154,41 +154,78 @@ ui <- function(request) {
                             column(12, align = "center",
                                    actionButton("update", "Update", width = '50%')
                             )),
+                          
+                          ############ start panel
+                          
+                          tabsetPanel(type = "tabs",
+                                      tabPanel("Go for it",
+                                               fluidRow(
+                                                 column(12, align = "center",
+                                                        tags$br(),
+                                                        tags$br(),
+                                                        
+                                                        htmlOutput("picture"),
+                                                        htmlOutput("some_text")
+                                                        
+                                                 )
+                                               ),
+                                               
+                                               fluidRow(
+                                                 
+                                                 column(12, align="center", 
+                                                        gt_output(outputId = "view1") %>% 
+                                                          shinycssloaders::withSpinner(type = 6,# types see https://projects.lukehaas.me/css-loaders/ 
+                                                                                       color = "#414141",
+                                                                                       color.background = "#FFFFFF")
+                                                 )
+                                               ),
+                                               
+                                               tags$br(),
+                                               
+                                               tags$p("Notes: these are ESTIMATES; please use accordingly. On 4th and 1, the model cannot know whether it's a long 1 or a short 1. Shorter distance would favor going. Do not use this in overtime. Use with EXTREME CAUTION in the final minute of a game as the model is not good with end of game clock scenarios.")
+                                               
+                                               
+                                               ### end panel
+                                               
+                                               
+                                               
+                                               
+                                      ),
+                                      tabPanel("2 point conversions",
+                                               
+                                               fluidRow(
+                                                 column(12, align = "center",
+                                                        tags$br(),
+                                                        tags$br(),
+                                                        
+                                                        htmlOutput("picture2"),
+                                                        htmlOutput("some_text2")
+                                                        
+                                                 )
+                                               ),
+                                               fluidRow(
+                                                 
+                                                 column(12, align="center", 
+                                                        gt_output(outputId = "view2") %>% 
+                                                          shinycssloaders::withSpinner(type = 6,# types see https://projects.lukehaas.me/css-loaders/ 
+                                                                                       color = "#414141",
+                                                                                       color.background = "#FFFFFF")
+                                                 )
+                                               )
+                                               
+                                               )
 
-                          fluidRow(
-                            column(12, align = "center",
-                                   tags$br(),
-                                   tags$br(),
+                                      )
+                          
                                    
-                            htmlOutput("picture"),
-                            htmlOutput("some_text")
-                            
-                                   )
                           ),
-                          
-                          fluidRow(
-                            
-                            column(12, align="center", 
-                                   gt_output(outputId = "view1") %>% 
-                                     shinycssloaders::withSpinner(type = 6,# types see https://projects.lukehaas.me/css-loaders/ 
-                                                                  color = "#414141",
-                                                                  color.background = "#FFFFFF")
-                            )
-                          ),
-                          
-                          tags$br(),
-                          
-                          tags$p("Notes: these are ESTIMATES; please use accordingly. On 4th and 1, the model cannot know whether it's a long 1 or a short 1. Shorter distance would favor going. Do not use this in overtime. Use with EXTREME CAUTION in the final minute of a game as the model is not good with end of game clock scenarios.")
-                          
-
-                          
-                          
-                 ),
-                 
                  tabPanel("About",
                           p("Notes: Data from @nflfastR. A thank you to Lee Sharpe (@LeeSharpeNFL) for hosting an updating source for game results and to Thomas Mock (@thomas_mock) for code to make the table look better. Website by Ben Baldwin (@benbbaldwin). Model writeup coming at some point...")
                           
-                 )
+                          
+                                      )
+
+ 
                  
       )
       
@@ -226,6 +263,9 @@ server <- function(input, output) {
   # input$defteam_to <- 1
   # input$home_ko <- 0
   # input$score_diff <- 5
+  # input$type <- "reg"
+  # input$runoff <- 0
+  # input$season <- 2020
   # 
 
   # get the situation from user input
@@ -269,7 +309,22 @@ server <- function(input, output) {
       expr = make_table(tableData(), fullInput())
   )
   
-  # for the team logo above decision
+  # get the data that goes in the 2pt table
+  tableData2 <- eventReactive(
+    input$update,
+    {
+      
+      make_2pt_table_data(fullInput())
+      
+    } , ignoreNULL = FALSE
+  )
+  
+  # make the 2pt table
+  output$view2 <- render_gt(
+    expr = make_table_2pt(tableData2(), fullInput())
+  )
+
+    # for the team logo above decision
   output$picture <-
     renderText({
       c(
@@ -279,12 +334,29 @@ server <- function(input, output) {
       )
     })
   
+  output$picture2 <-
+    renderText({
+      c(
+        '<img width="150" src="',
+        glue::glue("{teams %>% filter(team_abbr == input$posteam) %>% pull(team_logo_espn)}"),
+        '">'
+      )
+    })
+  
+  
   # say what the right decision is
   output$some_text <- renderText({ 
     
     return(glue::glue("<font size='+2'>Correct choice: <span style='color:red'>{tableData() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice)}</span> (difference: 
       <span style='color:green'> <strong> {round(tableData() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice_prob) - tableData() %>% arrange(-choice_prob) %>% dplyr::slice(2) %>% pull(choice_prob), 1)}%</strong></span>)</font>"))
 
+  })
+  
+  output$some_text2 <- renderText({ 
+    
+    return(glue::glue("<font size='+2'>Correct choice: <span style='color:red'>{tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice)}</span> (difference: 
+      <span style='color:green'> <strong> {round(tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice_prob) - tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(2) %>% pull(choice_prob), 1)}%</strong></span>)</font>"))
+    
   })
   
 }
