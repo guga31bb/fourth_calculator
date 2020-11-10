@@ -550,7 +550,7 @@ get_2pt_wp <- function(df) {
     dplyr::rename(prob = "value") %>%
     dplyr::pull(prob)
   
-  xp_prob <- as.numeric(mgcv::predict.bam(fg_model, newdata = df, type="response"))
+  xp_prob <- as.numeric(mgcv::predict.bam(fg_model, newdata = df %>% mutate(yardline_100 = 15), type="response"))
   
   wps <- 1 - tibble::tibble(
     score_differential = c(-df$score_differential, -df$score_differential - 1, -df$score_differential - 2),
