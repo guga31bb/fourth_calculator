@@ -16,6 +16,9 @@ punt_df <- readRDS("data/punt_data.rds")
 # for go for it model
 load('data/fd_model.Rdata', .GlobalEnv)
 
+# 2pt model
+load('data/two_pt_model.Rdata', .GlobalEnv)
+
 suppressWarnings(
   # load games file for getting game total, point spread, and roof
   games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
@@ -522,3 +525,188 @@ make_table <- function(df, current_situation) {
   
 }
   
+
+
+
+
+
+# function to get WP for field goal attempt
+get_2pt_wp <- function(df) {
+  
+  # stuff in the model
+  data <- df %>%
+    mutate(era2 = 0) %>%
+    select(
+      era2,  era3,     era4,     outdoors, 
+      retractable,  dome,    posteam_spread, total_line,  posteam_total 
+    )
+  
+  # get model output from situation
+  make_prob <- stats::predict(
+    two_pt_model,
+    as.matrix(data)
+  )  %>%
+    tibble::as_tibble() %>%
+    dplyr::rename(prob = "value") %>%
+    dplyr::pull(prob)
+  
+  xp_prob <- as.numeric(mgcv::predict.bam(fg_model, newdata = df, type="response"))
+  
+  wps <- 1 - tibble::tibble(
+    score_differential = c(-df$score_differential, -df$score_differential - 1, -df$score_differential - 2),
+    yardline_100 = 75,
+    posteam_timeouts_remaining = df$defteam_timeouts_remaining,
+    defteam_timeouts_remaining = df$posteam_timeouts_remaining,
+    down = 1,
+    ydstogo = 10,
+    half_seconds_remaining = df$half_seconds_remaining,
+    game_seconds_remaining = df$game_seconds_remaining,
+    receive_2h_ko = case_when(
+      df$qtr <= 2 & df$receive_2h_ko == 0 ~ 1,
+      df$qtr <= 2 & df$receive_2h_ko == 1 ~ 0,
+      TRUE ~ df$receive_2h_ko
+    ),
+    # switch posteam
+    posteam = if_else(df$home_team == df$posteam, df$away_team, df$home_team),
+    season = df$season,
+    home_team = df$home_team,
+    roof = df$roof,
+    spread_line = df$spread_line
+  ) %>%
+    nflfastR::calculate_expected_points() %>%
+    nflfastR::calculate_win_probability() %>%
+    pull(vegas_wp)
+  
+  # xp wp
+  xp_wp <- xp_prob * wps[[2]] + (1 - xp_prob) * wps[[1]]
+  
+  # 2pt wp
+  two_pt_wp <- make_prob * wps[[3]] + (1 - make_prob) * wps[[1]]
+  
+  # bind up the probs to return for table
+  results <- list(two_pt_wp, xp_wp, make_prob, xp_prob, wps)
+  names(results) <- c("WP 2pt", "WP kick", "Conv %", "PAT %", "WPs")
+  
+  return(results)
+}
+
+
+
+# get the numbers that go into the table
+# this is a separate function in case one wants the actual numbers
+make_2pt_table_data <- function(current_situation) {
+  
+  # get punt wp numbers
+  z <- get_2pt_wp(current_situation)
+  
+  go <- tibble::tibble(
+    "choice_prob" = z[[1]],
+    "choice" = "Go for 2",
+    "success_prob" = z[[3]],
+    "fail_wp" = z[[5]][[1]],
+    "success_wp" = z[[5]][[3]]
+  ) %>%
+    select(choice, choice_prob, success_prob, fail_wp, success_wp)
+  
+  pat <- tibble::tibble(
+    "choice_prob" = z[[2]],
+    "choice" = "Kick XP",
+    "success_prob" = z[[4]],
+    "fail_wp" = z[[5]][[1]],
+    "success_wp" = z[[5]][[2]]
+  ) %>%
+    select(choice, choice_prob, success_prob, fail_wp, success_wp)
+  
+  
+  for_return <- bind_rows(
+    go, pat
+  ) %>%
+    mutate(
+      choice_prob = 100 * choice_prob,
+      success_prob = 100 * success_prob,
+      fail_wp = 100 * fail_wp,
+      success_wp = 100 * success_wp
+    )
+  
+  # more debugging
+  # global_data <<- for_return
+  
+  return(for_return)
+}
+
+
+
+# make the actual table given the numbers
+make_table_2pt <- function(df, current_situation) {
+  
+  df %>%
+    arrange(-choice_prob) %>%
+    gt() %>%
+    cols_label(
+      choice = "",
+      choice_prob = "Win %",
+      success_prob = "Success %",
+      success_wp = "Succeed",
+      fail_wp = "Fail"
+    ) %>%
+    tab_style(
+      style = cell_text(color = "black", weight = "bold"),
+      locations = list(
+        cells_row_groups(),
+        cells_column_labels(everything())
+      )
+    ) %>% 
+    tab_options(
+      row_group.border.top.width = px(3),
+      row_group.border.top.color = "black",
+      row_group.border.bottom.color = "black",
+      table_body.hlines.color = "white",
+      table.border.top.color = "black",
+      table.border.top.width = px(1),
+      table.border.bottom.color = "white",
+      table.border.bottom.width = px(1),
+      column_labels.border.bottom.color = "black",
+      column_labels.border.bottom.width = px(2)
+    ) %>%
+    fmt_number(
+      columns = vars(choice_prob, success_prob, success_wp, fail_wp), decimals = 0
+    ) %>%
+    tab_source_note(md("**Please cite**: Ben Baldwin's 2-point down model"
+    )) %>%
+    tab_style(
+      style = list(
+        cell_text(color = "red", weight = "bold")
+      ),
+      locations = cells_body(
+        columns = vars(choice_prob)
+      )
+    )  %>% 
+    tab_style(
+      style = list(
+        cell_text(weight = "bold")
+      ),
+      locations = cells_body(
+        columns = vars(choice)
+      )
+    )  %>% 
+    tab_spanner(label = "Win % if",
+                columns = 4:5) %>%
+    cols_align(
+      columns = 2:5,
+      align = "center"
+    ) %>% 
+    tab_footnote(
+      footnote = "Expected win % for a given decision",
+      locations = cells_column_labels(2)
+    ) %>% 
+    tab_footnote(
+      footnote = "Likelihood of converting 2 point attempt or PAT",
+      locations = cells_column_labels(3)
+    )  %>%
+    tab_header(
+      title = md(glue::glue("{case_when(current_situation$score_differential < 0 ~ 'Down', current_situation$score_differential == 0 ~ 'Tied', current_situation$score_differential > 0 ~ 'Up')} {ifelse(current_situation$score_differential == 0, 'up', abs(current_situation$score_differential))}, Qtr {current_situation$qtr}, {hms::hms(current_situation$time) %>% substr(4, 8)}"))
+    )
+  
+}
+
+
