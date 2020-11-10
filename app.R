@@ -158,7 +158,7 @@ ui <- function(request) {
                           ############ start panel
                           
                           tabsetPanel(type = "tabs",
-                                      tabPanel("Go for it",
+                                      tabPanel("4th down",
                                                fluidRow(
                                                  column(12, align = "center",
                                                         tags$br(),
