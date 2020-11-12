@@ -363,8 +363,9 @@ server <- function(session, input, output) {
   observe({
     query <- parseQueryString(session$clientData$url_search)
     query1 <- paste(names(query), query, sep = "=", collapse=", ")
-    print(query1)
-    if(query1 == "a=b"){
+    # print(query1)
+    # print(substr(query1, (nchar(query1) - 4), (nchar(query1))))
+    if(substr(query1, (nchar(query1) - 4), (nchar(query1))) == "2pt=1"){
       updateTabsetPanel(session, "inTabset", selected = "two_pt")
     }
   })
