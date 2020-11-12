@@ -157,7 +157,7 @@ ui <- function(request) {
                           
                           ############ start panel
                           
-                          tabsetPanel(type = "tabs",
+                          tabsetPanel(type = "tabs", id = "inTabset",
                                       tabPanel("4th down",
                                                fluidRow(
                                                  column(12, align = "center",
@@ -191,7 +191,7 @@ ui <- function(request) {
                                                
                                                
                                       ),
-                                      tabPanel("2 point conversions",
+                                      tabPanel("2 point conversions", value = "two_pt",
                                                
                                                fluidRow(
                                                  column(12, align = "center",
@@ -242,7 +242,7 @@ ui <- function(request) {
 #####################################################################################
 ######## Define server app ###########################################
 #####################################################################################
-server <- function(input, output) {
+server <- function(session, input, output) {
   
   # Return the requested dataset ----
   # Note that we use eventReactive() here, which depends on
@@ -358,6 +358,17 @@ server <- function(input, output) {
       <span style='color:green'> <strong> {round(tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice_prob) - tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(2) %>% pull(choice_prob), 1)}%</strong></span>)</font>"))
     
   })
+  
+  
+  observe({
+    query <- parseQueryString(session$clientData$url_search)
+    query1 <- paste(names(query), query, sep = "=", collapse=", ")
+    print(query1)
+    if(query1 == "a=b"){
+      updateTabsetPanel(session, "inTabset", selected = "two_pt")
+    }
+  })
+  
   
 }
 
