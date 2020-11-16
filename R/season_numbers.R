@@ -4,25 +4,6 @@ library(future)
 source('R/helpers.R')
 source("https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R")
 
-# **************************************************************************************
-# get list of plays
-
-# for getting spreads
-games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
-  mutate(game_type = if_else(game_type == "REG", "reg", "post"))
-
-# get data
-pbp <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2020.rds")))
-
-# some prep
-plays <- pbp %>%
-  dplyr::group_by(game_id) %>%
-  dplyr::mutate(
-    receive_2h_ko = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0)
-  ) %>%
-  ungroup() %>%
-  filter(down == 4, vegas_wp > .05, vegas_wp < .95, game_seconds_remaining > 60)
-
 # the function
 get_probs <- function(p, games) {
   
@@ -43,10 +24,10 @@ get_probs <- function(p, games) {
     'yr' = p$season,
     "desc" = p$desc,
     'play_type' = p$play_type_nfl,
-    "type" = if_else(p$week <= 17, "reg", "post")
+    "type" = if_else(p$week <= 17, "reg", "post"),
+    "go" = p$go
   ) %>%
     prepare_df(games) 
-  
   
   probs <- play_data %>%
     make_table_data(punt_df)
@@ -63,6 +44,34 @@ get_probs <- function(p, games) {
   ) 
 }
 
+# **************************************************************************************
+# get list of plays
+
+# for getting spreads
+games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
+  mutate(game_type = if_else(game_type == "REG", "reg", "post"))
+
+# get data
+pbp <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2020.rds")))
+
+# some prep
+plays <- pbp %>%
+  dplyr::group_by(game_id) %>%
+  dplyr::mutate(
+    receive_2h_ko = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0)
+  ) %>%
+  ungroup() %>%
+  filter(down == 4, vegas_wp > .025, vegas_wp < .975, half_seconds_remaining > 30)
+
+# get down to one play per series
+# and get the initial situation
+plays <- plays %>%
+  mutate(go = rush + pass) %>%
+  group_by(posteam, game_id, series) %>%
+  mutate(go = max(go)) %>%
+  dplyr::slice(1) %>%
+  ungroup()
+
 # add probs to data
 future::plan(multisession)
 fourth_downs <- furrr::future_map_dfr(1 : nrow(plays), function(x) {
@@ -71,7 +80,7 @@ fourth_downs <- furrr::future_map_dfr(1 : nrow(plays), function(x) {
 })
 
 # **************************************************************************************
-# manipulate list
+# cleaning
 
 cleaned <- fourth_downs %>%
   mutate(play_no = 1 : n()) %>%
@@ -88,7 +97,6 @@ cleaned <- fourth_downs %>%
   select(-play_no) %>%
   mutate(
     go_boost = go_prob - max_non_go,
-    go = if_else(play_type %in% c("PASS", "RUSH", "SACK"), 1, 0),
     should_go = if_else(go_boost > 0, 1, 0)
   ) %>%
   arrange(go_boost) %>%
@@ -97,6 +105,8 @@ cleaned <- fourth_downs %>%
     game_id, url, posteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
   )
 
+# **************************************************************************************
+# decision-making table
 
 t <- cleaned %>%
   filter(
@@ -158,6 +168,8 @@ t
 
 t %>% gtsave("figures/team_behavior.png")
 
+# **************************************************************************************
+# worst decisions table
 
 t <- cleaned %>%
   filter(
@@ -227,5 +239,94 @@ cleaned %>%
   select(game_id, url)
 
 
+# **************************************************************************************
+# team results
+library(ggtext)
+library(ggpmisc)
+
+my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>, 2020")
+cleaned %>%
+  mutate(go_boost = round(go_boost, 0)) %>%
+  group_by(go_boost) %>%
+  summarize(go = 100 * mean(go)) %>%
+  ungroup() %>%
+  filter(between(go_boost, -15, 15)) %>%
+  ggplot(aes(go_boost, go)) + 
+  geom_point(size = 5) +
+  geom_vline(xintercept = 0)+
+  theme_bw()+
+  labs(x = "Gain in win probability by going for it",
+       y = "Go-for-it percentage",
+       caption = paste0("Figure: @benbbaldwin"),
+       title = my_title) +
+  theme(
+    legend.position = c(0.99, 0.99),
+    legend.justification = c(1, 1) ,
+    plot.title = element_markdown(size = 22, hjust = 0.5)
+  ) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 20)) +
+  annotate("text",x=-8, y= 90, label = "Should\nkick", color="red", size = 5) +
+  annotate("text",x=8, y= 90, label = "Should\ngo for it", color="red", size = 5) +
+  annotate("label",x=-8, y= 10, label = "Teams almost always kick\nwhen they should...", size = 5) +
+  annotate("label",x=8, y= 25, label = "...but teams still frequently\n kick when they\nshould go for it", size = 5) +
+  
+
+ggsave("figures/league_behavior.png")
+
+
+current <- cleaned %>%
+  filter(go_boost > 3) %>%
+  group_by(posteam) %>%
+  summarize(go = mean(go), n = n()) %>%
+  ungroup() %>%
+  left_join(nflfastR::teams_colors_logos, by=c('posteam' = 'team_abbr')) %>%
+  arrange(-go) %>%
+  mutate(rank = 1:n()) %>%
+  arrange(posteam)
+
+
+ids <- nflfastR::teams_colors_logos %>%
+  filter(!team_abbr %in% c('LAR', 'OAK', 'SD', 'STL'))
+images <- magick::image_read(ids%>% pull(team_logo_espn)) 
+
+logos <- tibble(
+  x = current$rank + .25, 
+  y = current$go + .02,
+  width = .035,
+  grob = 
+    map(1:32, function(x) {
+      grid::rasterGrob(images[x])
+    })
+)
+
+my_title <- glue::glue("Which teams <span style='color:red'>go for it</span> when they <span style='color:red'>should?</span>")
+ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
+  geom_col(data = current, aes(fill = ifelse(posteam=="SEA", team_color2, team_color)), 
+           width = 0.5, alpha = .6, show.legend = FALSE
+  ) +
+  geom_grob(data = logos, 
+            aes(x, y, label = grob, vp.width = width),
+            hjust = 0.7) +
+  scale_fill_identity(aesthetics = c("fill", "colour")) +
+  theme_bw() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_markdown(size=22,face = 2,hjust=.5),
+    plot.subtitle = element_text(size=8, hjust=.5),
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank()
+    ) +
+  # scale_y_continuous(expand=c(0,0), limits=c(0, max(current$go + 5))) +
+  labs(
+    x = "",
+    y = "Go rate",
+    title= my_title,
+    caption = glue::glue("@benbbaldwin | Sample size in parentheses\nAt least 3% win probability gain by going for it, excl. final 30 seconds of each half, win prob >2.5% and <97.5%}")
+  ) +
+  geom_text(data = current, aes(x = rank, y = -.015, size=.04, label = glue::glue("({n})")), show.legend = FALSE, nudge_x = 0, color="black")
+
+ggsave("figures/teams_2020.png")
 
 
