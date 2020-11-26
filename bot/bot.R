@@ -29,8 +29,12 @@ live_games <- readRDS(url(
       current_hour == game_hour & current_minute >= game_minute + 5 ~ 1,
       TRUE ~ 0
     ),
-    espn = dplyr::if_else(game_id == "2020_07_PIT_TEN", "401249063", espn)
-  ) %>%
+    espn = dplyr::case_when(
+      game_id == "2020_07_PIT_TEN" ~ "401249063",
+      game_id == "2020_10_WAS_DET" ~ "401220289",
+      TRUE ~ espn
+      )
+    ) %>%
   dplyr::filter(started == 1) %>%
   dplyr::select(game_id, espn, home_team, away_team, week)
 
@@ -58,6 +62,18 @@ if (nrow(live_games) > 0) {
       dplyr::mutate(old = 1)
   } else {
     # this is so we can remove the file if we want to start over
+    old_plays <- tibble::tibble(
+      "game_id" = as.character("XXXXXX"),
+      "index" = as.integer(0),
+      "old" = as.integer(1)
+    )
+  }
+  
+  # prevent crashing if no game_id for some reason
+  if (!"game_id" %in% names(old_plays)) {
+    if (file.exists("bot/old_plays.rds")) {
+      file.remove("bot/old_plays.rds")
+    }
     old_plays <- tibble::tibble(
       "game_id" = as.character("XXXXXX"),
       "index" = as.integer(0),
