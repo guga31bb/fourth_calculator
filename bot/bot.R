@@ -26,7 +26,7 @@ live_games <- readRDS(url(
     # has already started
     started = dplyr::case_when(
       current_hour > game_hour ~ 1,
-      current_hour == game_hour & current_minute >= game_minute + 8 ~ 1,
+      current_hour == game_hour & current_minute >= game_minute + 5 ~ 1,
       TRUE ~ 0
     ),
     espn = dplyr::case_when(
@@ -57,9 +57,23 @@ if (nrow(live_games) > 0) {
   
   # get list of old plays before we do anything
   if (file.exists("bot/old_plays.rds")) {
-    old_plays <- readRDS("bot/old_plays.rds") %>%
-      dplyr::select(game_id, index) %>%
-      dplyr::mutate(old = 1)
+    
+    # read the file if it exists
+    old_plays <- readRDS("bot/old_plays.rds")
+    
+    # if it's just an empty df, just make an empty one
+    if (!"game_id" %in% names(old_plays)) {
+      old_plays <- tibble::tibble(
+        "game_id" = as.character("XXXXXX"),
+        "index" = as.integer(0),
+        "old" = as.integer(1)
+      )
+    # if it already exists, take game id and index
+    } else {
+      old_plays <- old_plays %>%
+        dplyr::select(game_id, index) %>%
+        dplyr::mutate(old = 1)
+    }
   } else {
     # this is so we can remove the file if we want to start over
     old_plays <- tibble::tibble(
@@ -69,17 +83,7 @@ if (nrow(live_games) > 0) {
     )
   }
   
-  # prevent crashing if no game_id for some reason
-  if (!"game_id" %in% names(old_plays)) {
-    if (file.exists("bot/old_plays.rds")) {
-      file.remove("bot/old_plays.rds")
-    }
-    old_plays <- tibble::tibble(
-      "game_id" = as.character("XXXXXX"),
-      "index" = as.integer(0),
-      "old" = as.integer(1)
-    )
-  }
+
   
   # get updated plays from ongoing games
   plays <- map_df(1 : nrow(live_games), function(x) {
