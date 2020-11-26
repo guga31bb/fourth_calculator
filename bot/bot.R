@@ -26,7 +26,7 @@ live_games <- readRDS(url(
     # has already started
     started = dplyr::case_when(
       current_hour > game_hour ~ 1,
-      current_hour == game_hour & current_minute >= game_minute + 5 ~ 1,
+      current_hour == game_hour & current_minute >= game_minute + 8 ~ 1,
       TRUE ~ 0
     ),
     espn = dplyr::case_when(
