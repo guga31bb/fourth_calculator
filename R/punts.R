@@ -25,7 +25,7 @@ get_density <- function(x, y, ...) {
 
 # figure out before and after of each punt
 points <- pbp %>%
-  select(desc, yardline_100, kick_distance, return_yards) %>%
+  select(desc, yardline_100, kick_distance, return_yards, fumble_lost) %>%
   mutate(
     # give return yards too
     yardline_after = yardline_100 - kick_distance + return_yards,
@@ -40,11 +40,14 @@ points <- pbp %>%
     # there's 2 safeties that are too annoying to deal with
     yardline_after = if_else(yardline_after == 0, 1, yardline_after),
     blocked = if_else(stringr::str_detect(desc, "BLOCKED") == 1, 1, 0),
-    return_td = if_else(yardline_after == 100, 1, 0)
+    return_td = if_else(yardline_after == 100, 1, 0),
+    # there's 1 play where there was a fumble lost after a blocked punt
+    # this isn't a muffed punt
+    fumble_lost = if_else(blocked == 1, 0, fumble_lost)
   ) %>%
   # there's like 10 of these for some reason
   filter(!is.na(yardline_after)) %>%
-  select(desc, yardline_100, yardline_after, blocked, return_td)
+  select(desc, yardline_100, yardline_after, blocked, return_td, fumble_lost)
 
 points
 
@@ -54,6 +57,7 @@ points
 outliers <- points %>%
   group_by(yardline_100) %>%
   summarize(
+    muffed = sum(fumble_lost),
     blocked = sum(blocked),
     return_td = sum(return_td),
     n = n()
@@ -72,9 +76,11 @@ outliers <- points %>%
   ) %>%
   group_by(bin) %>%
   mutate(
+    muffed = sum(muffed),
     blocked = sum(blocked),
     return_td = sum(return_td),
     n = sum(n),
+    bin_muffed_pct = muffed / n,
     bin_blocked_pct = blocked / n,
     bin_td_pct = return_td / n,
   ) %>%
@@ -104,7 +110,7 @@ density_map_normal <- points %>%
   mutate(density = get_density(yardline_100, yardline_after, n = 100))
 
 # get final percentages
-density_map_normal %>%
+df <- density_map_normal %>%
   group_by(yardline_100, yardline_after) %>%
   dplyr::slice(1) %>%
   ungroup() %>%
@@ -127,9 +133,35 @@ density_map_normal %>%
     yardline_after = if_else(yardline_after == 999, yardline_100, yardline_after)
   ) %>%
   ungroup() %>%
+  left_join(
+    outliers %>% select(yardline_100, bin_muffed_pct), by = "yardline_100"
+  ) %>%
   arrange(yardline_100, yardline_after) %>%
-  select(yardline_100, yardline_after, pct) %>%
-  filter(yardline_100 > 30) %>%
+  select(yardline_100, yardline_after, pct, bin_muffed_pct) %>%
+  filter(yardline_100 > 30) 
+
+bind_rows(
+  # get a df without the return and blocked probs
+  df %>% 
+    filter(yardline_after != 100 & yardline_100 != yardline_after),
+  df
+) %>%
+  arrange(yardline_100, yardline_after) %>%
+  group_by(yardline_100, yardline_after) %>%
+  mutate(
+    muff = 1 : n() - 1,
+    pct = if_else(muff == 1, bin_muffed_pct * pct, pct),
+    pct = if_else(
+      muff == 0 & yardline_after != 100 & yardline_100 != yardline_after, (1 - bin_muffed_pct) * pct, pct
+    )
+  ) %>%
+  # one last making sure all the pct add up to 1
+  group_by(yardline_100) %>%
+  mutate(tot_pct = sum(pct), pct = pct / tot_pct) %>%
+  ungroup() %>%
+  select(
+    yardline_100, yardline_after, pct, muff
+  ) %>%
   saveRDS('data/punt_data.rds')
 
 

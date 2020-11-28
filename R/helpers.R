@@ -201,7 +201,7 @@ get_punt_wp <- function(df, punt_df) {
   # get the distribution at a yard line from punt data
   punt_probs <- punt_df %>%
     filter(yardline_100 == df$yardline_100) %>%
-    select(yardline_after, pct)
+    select(yardline_after, pct, muff)
   
   if (nrow(punt_probs) > 0) {
     
@@ -227,7 +227,25 @@ get_punt_wp <- function(df, punt_df) {
           qtr <= 2 & receive_2h_ko == 0 & (yardline_after == 100) ~ 1,
           qtr <= 2 & receive_2h_ko == 1 & (yardline_after == 100) ~ 0,
           TRUE ~ receive_2h_ko
-        )
+        ),
+        
+        # now deal with muffed punts (fumble lost)
+        # again we need to flip everything back
+        posteam = if_else(muff == 1, df$posteam, posteam),
+        yardline_100 = if_else(muff == 1, as.integer(100 - yardline_100), yardline_100),
+        posteam_timeouts_remaining = dplyr::if_else(muff == 1,
+                                                    df$posteam_timeouts_remaining,
+                                                    posteam_timeouts_remaining),
+        defteam_timeouts_remaining = dplyr::if_else(muff == 1,
+                                                    df$defteam_timeouts_remaining,
+                                                    defteam_timeouts_remaining),
+        score_differential = if_else(muff == 1, as.integer(-score_differential), as.integer(score_differential)),
+        receive_2h_ko = case_when(
+          qtr <= 2 & receive_2h_ko == 0 & (muff == 1) ~ 1,
+          qtr <= 2 & receive_2h_ko == 1 & (muff == 1) ~ 0,
+          TRUE ~ receive_2h_ko
+        ),
+        ydstogo = if_else(yardline_100 < 10, yardline_100, as.integer(ydstogo))
       )
     
     # have to flip bc other team
@@ -236,7 +254,7 @@ get_punt_wp <- function(df, punt_df) {
       nflfastR::calculate_win_probability() %>%
       mutate(
         # for the punt return TD case
-        vegas_wp = if_else(yardline_after == 100, 1 - vegas_wp, vegas_wp),
+        vegas_wp = if_else(yardline_after == 100 | muff == 1, 1 - vegas_wp, vegas_wp),
         
         # fill in end of game situation when team can kneel out clock
         # discourages punting when the other team can end the game
