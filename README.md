@@ -18,6 +18,8 @@ The code that powers the Twitter fourth down bot [is in this folder here](https:
 
 ## Current limitations
 
+There are some edge cases that are not accounted for. These should only make a marginal difference to the recommendations as they are largely edge cases (e.g. the possibility for a field goal to be blocked and returned).
+
 * The **go for it** model does not allow for the possibility of a turnover return. However, long returns are extremely rare: For example, in 2018 and 2019 there were only four defensive touchdowns on plays where teams went for fourth downs out of 1,236 plays, and all of these happened when the game was well in hand for the other team.
 * The **punt** model doesn’t account for the punter or returner, ignores penalties on returns and ignores the potential for blocked punts to be returned for touchdowns
 * The **field goal** model doesn’t account for who the kicker is, what the weather is (only relevant for outdoor games), or the possibility of a kick being blocked and returned for a touchdown
