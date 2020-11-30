@@ -180,7 +180,7 @@ get_data <- function(df) {
           ) %>%
           filter(
             down == 4, 
-            !(time < 30 & qtr %in% c(2, 4)),
+            !(time < 30 & qtr %in% c(4)),
             is.na(timeout_team),
             type_text != "Two-minute warning",
             type_text != "End Period"
