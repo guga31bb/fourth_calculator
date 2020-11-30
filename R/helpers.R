@@ -122,6 +122,38 @@ flip_team <- function(df) {
   
 }
 
+# function to move the game to start of 3rd Q on an end-of-half play
+flip_half <- function(df) {
+  
+  # make game touchback after opening kickoff
+  for_return <- df %>%
+    mutate(
+      posteam = case_when(
+        home_opening_kickoff == 1 ~ away_team,
+        home_opening_kickoff == 0 ~ home_team
+      ),
+      qtr = 3,
+      posteam_timeouts_remaining = 3,
+      defteam_timeouts_remaining = 3,
+      down = 1,
+      ydstogo = 10,
+      yardline_100 = 75,
+      half_seconds_remaining = 1800,
+      game_seconds_remaining = 1800,
+      score_differential = if_else(
+        posteam == df$posteam, score_differential, -score_differential
+      )
+    )
+  
+  if (df %>% dplyr::slice(1) %>% pull(qtr) == 2 & df %>% dplyr::slice(1) %>% pull(half_seconds_remaining) == 0) {
+    return(for_return)
+  } else {
+    return(df)
+  }
+  
+}
+
+
 # function to get WP for field goal attempt
 get_fg_wp <- function(df) {
   
@@ -145,6 +177,8 @@ get_fg_wp <- function(df) {
       yardline_100 = 75,
       score_differential = score_differential - 3
     ) %>%
+    # for end of 1st half stuff
+    flip_half() %>%
     nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
     mutate(
@@ -170,6 +204,8 @@ get_fg_wp <- function(df) {
       # yardline_100 can't be bigger than 80 due to some weird nfl rule
       yardline_100 = if_else(yardline_100 > 80, 80, yardline_100)
     ) %>%
+    # for end of 1st half stuff
+    flip_half() %>%
     nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
     mutate(
@@ -185,6 +221,15 @@ get_fg_wp <- function(df) {
       
     ) %>%
     pull(vegas_wp)
+  
+  # for end of half situations
+  # when team gets ball again after halftime
+  if (df %>% flip_team() %>% pull(half_seconds_remaining) == 0 & df$qtr == 2 &
+    df %>% flip_team() %>% flip_half() %>% pull(posteam) == df$posteam) {
+    # message("test")
+    fg_make_wp <- 1 - fg_make_wp
+    fg_miss_wp <- 1 - fg_miss_wp
+  }
   
   # FG win prob is weighted avg of make and miss WPs
   fg_wp <- fg_prob * fg_make_wp + (1 - fg_prob) * fg_miss_wp
@@ -358,6 +403,7 @@ get_go_wp <- function(df) {
       # assume touchback after kick
       yardline_100 = if_else(yardline_100 == 0, as.integer(75), as.integer(yardline_100))
     ) %>%
+    flip_half() %>%
     nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
     mutate(
