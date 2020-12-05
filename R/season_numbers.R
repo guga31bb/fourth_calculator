@@ -25,7 +25,8 @@ get_probs <- function(p, games) {
     "desc" = p$desc,
     'play_type' = p$play_type_nfl,
     "type" = if_else(p$week <= 17, "reg", "post"),
-    "go" = p$go
+    "go" = p$go,
+    "prior_wp" = p$vegas_wp
   ) %>%
     prepare_df(games) 
   
@@ -61,7 +62,8 @@ plays <- pbp %>%
     receive_2h_ko = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0)
   ) %>%
   ungroup() %>%
-  filter(down == 4, vegas_wp > .025, vegas_wp < .975, half_seconds_remaining > 30)
+  filter(down == 4, game_seconds_remaining > 30, 
+         !is.na(half_seconds_remaining), !is.na(qtr), !is.na(posteam))
 
 # get down to one play per series
 # and get the initial situation
@@ -72,10 +74,11 @@ plays <- plays %>%
   dplyr::slice(1) %>%
   ungroup()
 
+
 # add probs to data
 future::plan(multisession)
 fourth_downs <- furrr::future_map_dfr(1 : nrow(plays), function(x) {
-  # message(glue::glue("game {plays %>% dplyr::slice(x) %>% pull(game_id)}"))
+  # message(glue::glue("game {plays %>% dplyr::slice(x) %>% pull(game_id)} play {plays %>% dplyr::slice(x) %>% pull(play_id)}"))
   get_probs(plays %>% dplyr::slice(x), games)
 })
 
@@ -100,9 +103,9 @@ cleaned <- fourth_downs %>%
     should_go = if_else(go_boost > 0, 1, 0)
   ) %>%
   arrange(go_boost) %>%
-  filter(!(mins < 1 & qtr == 4)) %>%
+  # filter(!(mins < 1 & qtr == 4)) %>%
   select(
-    game_id, url, posteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
+    game_id, prior_wp, url, posteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
   )
 
 # **************************************************************************************
@@ -158,8 +161,7 @@ t <- cleaned %>%
     align = "center"
   ) %>% 
   tab_header(
-    title = md(glue::glue("NFL team decision-making by go recommendation")),
-    subtitle = md(glue::glue("2020, win probability between 5 and 95 percent"))
+    title = md(glue::glue("NFL team decision-making by go recommendation, 2020"))
   ) %>%
   tab_source_note(md('**Notes**: "Definitely" recommendations are greater than 4 percentage point advantage,<br> "probably" 1-4 percentage points'))
 
@@ -244,39 +246,80 @@ cleaned %>%
 library(ggtext)
 library(ggpmisc)
 
-my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>, 2020")
-cleaned %>%
+my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>")
+plot <- cleaned %>%
+  filter(prior_wp > .05 & prior_wp < .95) %>%
   mutate(go_boost = round(go_boost, 0)) %>%
   group_by(go_boost) %>%
   summarize(go = 100 * mean(go)) %>%
   ungroup() %>%
-  filter(between(go_boost, -15, 15)) %>%
-  ggplot(aes(go_boost, go)) + 
-  geom_point(size = 5) +
+  filter(between(go_boost, -10, 10)) %>%
+  mutate(
+    should_go = if_else(go_boost >= 0, 1, 0)
+  )
+
+plot %>%
+  ggplot(aes(go_boost, go, color = as.factor(should_go))) + 
+  geom_point(size = 5, color = "black", alpha = .5) +
   geom_vline(xintercept = 0)+
+  geom_smooth(method = "lm", show.legend = F, se = F, size = 3)+
   theme_bw()+
   labs(x = "Gain in win probability by going for it",
        y = "Go-for-it percentage",
-       caption = paste0("Figure: @benbbaldwin"),
+       caption = paste0("Figure: @benbbaldwin | Win prob between 5% and 95%"),
+       subtitle = "By strength of @ben_bot_baldwin recommendation, 2020",
        title = my_title) +
   theme(
-    legend.position = c(0.99, 0.99),
-    legend.justification = c(1, 1) ,
-    plot.title = element_markdown(size = 22, hjust = 0.5)
+    legend.position = "none",
+    plot.title = element_markdown(size = 22, hjust = 0.5),
+    plot.subtitle = element_markdown(size = 12, hjust = 0.5)
   ) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 20)) +
-  annotate("text",x=-8, y= 90, label = "Should\nkick", color="red", size = 5) +
-  annotate("text",x=8, y= 90, label = "Should\ngo for it", color="red", size = 5) +
-  annotate("label",x=-8, y= 10, label = "Teams almost always kick\nwhen they should...", size = 5) +
-  annotate("label",x=8, y= 25, label = "...but teams still frequently\n kick when they\nshould go for it", size = 5) +
+  annotate("text",x=-4, y= 90, label = "Should\nkick", color="red", size = 5) +
+  annotate("text",x=3, y= 90, label = "Should\ngo for it", color="red", size = 5) +
+  annotate("label",x=-6, y= 15, label = "Teams almost always kick\nwhen they should...", size = 5) +
+  annotate("label",x=6, y= 25, label = "...but frequently\n kick when they\nshould go for it", size = 5)
   
-
 ggsave("figures/league_behavior.png")
 
+# ###########
+# go by WP
+my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>")
+plot <- cleaned %>%
+  filter(go_boost > 2) %>%
+  mutate(wp = round(100 * prior_wp, 0)) %>%
+  group_by(wp) %>%
+  summarize(go = 100 * mean(go), n = n()) %>%
+  ungroup()
 
+cleaned %>%
+  filter(go_boost > 2) %>%
+  mutate(prior_wp = 100 * prior_wp) %>%
+  ggplot(aes(prior_wp, go)) + 
+  # geom_point(size = 5, color = "black", alpha = .5) +
+  geom_smooth(show.legend = F, se = F, size = 3, color = "black")+
+  theme_bw()+
+  labs(x = "Win probability prior to play",
+       y = "Go-for-it percentage",
+       caption = paste0("Figure: @benbbaldwin"),
+       subtitle = "@ben_bot_baldwin gain in win prob by going for it > 2 percentage points",
+       title = my_title) +
+  theme(
+    legend.position = "none",
+    plot.title = element_markdown(size = 22, hjust = 0.5),
+    plot.subtitle = element_markdown(size = 12, hjust = 0.5)
+  ) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), limits = c(0, 1)) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 20)) 
+
+ggsave("figures/league_behavior_wp.png")
+
+# ######################################################
+# ############## team bar chart
 current <- cleaned %>%
-  filter(go_boost > 3) %>%
+  filter(go_boost > 2) %>%
+  filter(prior_wp > .2) %>%
   group_by(posteam) %>%
   summarize(go = mean(go), n = n()) %>%
   ungroup() %>%
@@ -319,14 +362,72 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
     axis.ticks.x=element_blank()
     ) +
   # scale_y_continuous(expand=c(0,0), limits=c(0, max(current$go + 5))) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
   labs(
     x = "",
     y = "Go rate",
     title= my_title,
-    caption = glue::glue("@benbbaldwin | Sample size in parentheses\nAt least 3% win probability gain by going for it, excl. final 30 seconds of each half, win prob >2.5% and <97.5%}")
+    subtitle = "When @ben_bot_baldwin recommends going for it (gain in win prob. at least 2 percentage points)",
+    caption = glue::glue("Sample size in parentheses\nExcl. final 30 seconds of game. Win prob >20%")
   ) +
   geom_text(data = current, aes(x = rank, y = -.015, size=.04, label = glue::glue("({n})")), show.legend = FALSE, nudge_x = 0, color="black")
 
 ggsave("figures/teams_2020.png")
+
+
+
+
+current <- cleaned %>%
+  filter(go_boost > 0, go == 0) %>%
+  group_by(posteam) %>%
+  summarize(go = sum(go_boost), n = n()) %>%
+  ungroup() %>%
+  left_join(nflfastR::teams_colors_logos, by=c('posteam' = 'team_abbr')) %>%
+  arrange(-go) %>%
+  mutate(rank = 1:n()) %>%
+  arrange(posteam)
+
+
+logos <- tibble(
+  x = current$rank + .25, 
+  y = current$go + .02,
+  width = .035,
+  grob = 
+    map(1:32, function(x) {
+      grid::rasterGrob(images[x])
+    })
+)
+
+my_title <- glue::glue("Expected win probability <span style='color:red'>lost by kicking in go situations</span>")
+ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
+  geom_col(data = current, aes(fill = ifelse(posteam=="SEA", team_color2, team_color)), 
+           width = 0.5, alpha = .6, show.legend = FALSE
+  ) +
+  geom_grob(data = logos, 
+            aes(x, y, label = grob, vp.width = width),
+            hjust = 0.7) +
+  scale_fill_identity(aesthetics = c("fill", "colour")) +
+  theme_bw() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_markdown(size=22,face = 2,hjust=.5),
+    plot.subtitle = element_text(size=8, hjust=.5),
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank()
+  ) +
+  # scale_y_continuous(expand=c(0,0), limits=c(0, max(current$go + 5))) +
+  scale_y_continuous(n.breaks = 10) +
+  labs(
+    x = "",
+    y = "Win probability lost",
+    title= my_title,
+    caption = glue::glue("@benbbaldwin | Excl. final 30 seconds of game")
+  )
+  # geom_text(data = current, aes(x = rank, y = -.015, size=.04, label = glue::glue("({n})")), show.legend = FALSE, nudge_x = 0, color="black")
+
+ggsave("figures/teams_lost_2020.png")
+
+
 
 
