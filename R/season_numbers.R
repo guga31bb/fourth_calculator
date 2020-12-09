@@ -6,120 +6,21 @@ library(ggpmisc)
 
 source('R/helpers.R')
 source("https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R")
-
-# the function
-get_probs <- function(p, games) {
-  
-  play_data <- tibble::tibble(
-    "game_id" = p$game_id,
-    "qtr" = p$qtr,
-    "time" = p$quarter_seconds_remaining,
-    'posteam' = p$posteam,
-    'away_team' = p$away_team,
-    'home_team' = p$home_team,
-    'yardline_100' = p$yardline_100,
-    'ydstogo' = p$ydstogo,
-    'posteam_timeouts_remaining' = p$posteam_timeouts_remaining,
-    'defteam_timeouts_remaining' = p$defteam_timeouts_remaining,
-    'home_opening_kickoff' = p$receive_2h_ko,
-    'score_differential' = p$score_differential,
-    'runoff' = 0,
-    'yr' = p$season,
-    "desc" = p$desc,
-    'play_type' = p$play_type_nfl,
-    "type" = if_else(p$week <= 17, "reg", "post"),
-    "go" = p$go,
-    "prior_wp" = p$vegas_wp
-  ) %>%
-    prepare_df(games) 
-  
-  probs <- play_data %>%
-    make_table_data(punt_df)
-  
-  return_probs <- tibble::tibble(
-    "go_prob" = probs %>% filter(choice == "Go for it") %>% pull(choice_prob),
-    "fg_prob" = probs %>% filter(choice == "Field goal attempt") %>% pull(choice_prob),
-    "punt_prob" = probs %>% filter(choice == "Punt") %>% pull(choice_prob)
-  )
-  
-  bind_cols(
-    play_data,
-    return_probs
-  ) 
-}
+source('R/season_numbers_functions.R')
 
 # **************************************************************************************
+# the first part: numbers for one season only (2020 here)
 # get list of plays
 
 # which season do you want?
-s = 2017
-
-# get data
-pbp <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_{s}.rds")))
-
-# some prep
-plays <- pbp %>%
-  dplyr::group_by(game_id) %>%
-  dplyr::mutate(
-    receive_2h_ko = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0)
-  ) %>%
-  ungroup() %>%
-  filter(down == 4, game_seconds_remaining > 30, 
-         !is.na(half_seconds_remaining), !is.na(qtr), !is.na(posteam))
-
-# get down to one play per series
-# and get the initial situation
-plays <- plays %>%
-  mutate(go = rush + pass) %>%
-  group_by(posteam, game_id, series) %>%
-  mutate(go = max(go)) %>%
-  dplyr::slice(1) %>%
-  ungroup() %>%
-  mutate_at(vars(home_team, away_team), funs(case_when(
-    . %in% "JAC" ~ "JAX",
-    . %in% "STL" ~ "LA",
-    . %in% "LAR" ~ "LA",
-    . %in% "SD" ~ "LAC",
-    . %in% "OAK" ~ "LV",
-    TRUE ~ .
-  )))
-
-
-# add probs to data
-future::plan(multisession)
-fourth_downs <- furrr::future_map_dfr(1 : nrow(plays), function(x) {
-  message(glue::glue("game {plays %>% dplyr::slice(x) %>% pull(game_id)} play {plays %>% dplyr::slice(x) %>% pull(play_id)}"))
-  get_probs(plays %>% dplyr::slice(x), games)
-})
-
-# **************************************************************************************
-# cleaning
-
-cleaned <- fourth_downs %>%
-  mutate(play_no = 1 : n()) %>%
-  group_by(play_no) %>%
-  mutate(
-    punt_prob = if_else(is.na(punt_prob), 0, punt_prob),
-    max_non_go = max(fg_prob, punt_prob, na.rm = T),
-    mins = time %/% 60,
-    seconds = time %% 60,
-    url = 
-      glue::glue("https://rbsdm.com/stats/fourth_calculator/?_inputs_&posteam_to=%22{posteam_timeouts_remaining}%22&posteam=%22{posteam}%22&home_ko=%22{home_opening_kickoff}%22&mins={mins}&update=0&defteam_to=%22{defteam_timeouts_remaining}%22&qtr=%22{qtr}%22&season=%22{season}%22&away=%22{away_team}%22&yardline={yardline_100}&secs={seconds}&score_diff={score_differential}&home=%22{home_team}%22&ydstogo={ydstogo}&runoff=0")
-  ) %>%
-  ungroup() %>%
-  select(-play_no) %>%
-  mutate(
-    go_boost = go_prob - max_non_go,
-    should_go = if_else(go_boost > 0, 1, 0)
-  ) %>%
-  arrange(go_boost) %>%
-  # filter(!(mins < 1 & qtr == 4)) %>%
-  select(
-    game_id, prior_wp, url, posteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
-  )
+# note: this will take a few minutes
+cleaned <- get_season(2020)
 
 # **************************************************************************************
 # decision-making table
+
+# this is just for table titles now
+s = 2020
 
 t <- cleaned %>%
   filter(
@@ -383,8 +284,7 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
 ggsave(glue::glue("figures/teams_{s}.png"))
 
 
-
-
+# total WP lost
 current <- cleaned %>%
   filter(go_boost > 0, go == 0) %>%
   group_by(posteam) %>%
@@ -432,10 +332,21 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
     title= my_title,
     caption = glue::glue("@benbbaldwin | Excl. final 30 seconds of game")
   )
-  # geom_text(data = current, aes(x = rank, y = -.015, size=.04, label = glue::glue("({n})")), show.legend = FALSE, nudge_x = 0, color="black")
 
 ggsave(glue::glue("figures/teams_lost_{s}.png"))
 
 
+
+# **************************************************************************************
+# the second part: numbers for every season
+
+# this will take a very long time
+cleaned <- map_df(2014:2020, function(x) {
+  
+  get_season(x)
+  
+})
+  
+  
 
 
