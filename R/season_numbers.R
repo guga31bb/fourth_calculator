@@ -1,6 +1,9 @@
 library(tidyverse)
 library(gt)
 library(future)
+library(ggtext)
+library(ggpmisc)
+
 source('R/helpers.R')
 source("https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R")
 
@@ -52,8 +55,11 @@ get_probs <- function(p, games) {
 games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
   mutate(game_type = if_else(game_type == "REG", "reg", "post"))
 
+# which season do you want?
+s = 2019
+
 # get data
-pbp <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2020.rds")))
+pbp <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_{s}.rds")))
 
 # some prep
 plays <- pbp %>%
@@ -72,13 +78,21 @@ plays <- plays %>%
   group_by(posteam, game_id, series) %>%
   mutate(go = max(go)) %>%
   dplyr::slice(1) %>%
-  ungroup()
+  ungroup() %>%
+  mutate_at(vars(home_team, away_team), funs(case_when(
+    . %in% "JAC" ~ "JAX",
+    . %in% "STL" ~ "LA",
+    . %in% "LAR" ~ "LA",
+    . %in% "SD" ~ "LAC",
+    . %in% "OAK" ~ "LV",
+    TRUE ~ .
+  )))
 
 
 # add probs to data
 future::plan(multisession)
 fourth_downs <- furrr::future_map_dfr(1 : nrow(plays), function(x) {
-  # message(glue::glue("game {plays %>% dplyr::slice(x) %>% pull(game_id)} play {plays %>% dplyr::slice(x) %>% pull(play_id)}"))
+  message(glue::glue("game {plays %>% dplyr::slice(x) %>% pull(game_id)} play {plays %>% dplyr::slice(x) %>% pull(play_id)}"))
   get_probs(plays %>% dplyr::slice(x), games)
 })
 
@@ -243,8 +257,6 @@ cleaned %>%
 
 # **************************************************************************************
 # team results
-library(ggtext)
-library(ggpmisc)
 
 my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>")
 plot <- cleaned %>%
@@ -315,7 +327,7 @@ cleaned %>%
 
 ggsave("figures/league_behavior_wp.png")
 
-# ######################################################
+# ###################################################### #######################
 # ############## team bar chart
 current <- cleaned %>%
   filter(go_boost > 2) %>%
