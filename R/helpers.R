@@ -71,10 +71,10 @@ prepare_df <- function(df, games) {
       half_seconds_remaining = if_else(qtr == 2 | qtr == 4, time, time + 900),
       game_seconds_remaining = if_else(qtr <= 2, half_seconds_remaining + 1800, half_seconds_remaining),
       model_roof = roof,
-      # for now, assume that people are using the calculator for 2018 to present
+      # for now, assume that people are using the calculator for 2014 to present
+      era3 = dplyr::if_else(season > 2013 & season <= 2017, 1, 0),
+      era4 = dplyr::if_else(season > 2017, 1, 0),
       era = 3,
-      era3 = 0,
-      era4 = 1,
       posteam_spread = if_else(posteam == home_team, spread_line, -spread_line),
       home_total = (total_line + spread_line) / 2,
       away_total = (total_line - spread_line) / 2,

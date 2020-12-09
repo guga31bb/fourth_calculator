@@ -51,12 +51,8 @@ get_probs <- function(p, games) {
 # **************************************************************************************
 # get list of plays
 
-# for getting spreads
-games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
-  mutate(game_type = if_else(game_type == "REG", "reg", "post"))
-
 # which season do you want?
-s = 2019
+s = 2017
 
 # get data
 pbp <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_{s}.rds")))
@@ -355,7 +351,7 @@ logos <- tibble(
     })
 )
 
-my_title <- glue::glue("Which teams <span style='color:red'>go for it</span> when they <span style='color:red'>should?</span>")
+my_title <- glue::glue("Which teams <span style='color:red'>go for it</span> when they <span style='color:red'>should?</span> {s}")
 ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   geom_col(data = current, aes(fill = ifelse(posteam=="SEA", team_color2, team_color)), 
            width = 0.5, alpha = .6, show.legend = FALSE
@@ -384,7 +380,7 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   ) +
   geom_text(data = current, aes(x = rank, y = -.015, size=.04, label = glue::glue("({n})")), show.legend = FALSE, nudge_x = 0, color="black")
 
-ggsave("figures/teams_2020.png")
+ggsave(glue::glue("figures/teams_{s}.png"))
 
 
 
@@ -410,7 +406,7 @@ logos <- tibble(
     })
 )
 
-my_title <- glue::glue("Expected win probability <span style='color:red'>lost by kicking in go situations</span>")
+my_title <- glue::glue("Expected win probability <span style='color:red'>lost by kicking in go situations</span>, {s}")
 ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   geom_col(data = current, aes(fill = ifelse(posteam=="SEA", team_color2, team_color)), 
            width = 0.5, alpha = .6, show.legend = FALSE
@@ -438,7 +434,7 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   )
   # geom_text(data = current, aes(x = rank, y = -.015, size=.04, label = glue::glue("({n})")), show.legend = FALSE, nudge_x = 0, color="black")
 
-ggsave("figures/teams_lost_2020.png")
+ggsave(glue::glue("figures/teams_lost_{s}.png"))
 
 
 
