@@ -340,13 +340,94 @@ ggsave(glue::glue("figures/teams_lost_{s}.png"))
 # **************************************************************************************
 # the second part: numbers for every season
 
-# this will take a very long time
-cleaned <- map_df(2014:2020, function(x) {
+# get old season numbers if they aren't there already
+if (!file.exists("data/prior_season_decisions.rds")) {
   
-  get_season(x)
+  # this will take a very long time
+  cleaned_old <- map_df(2014:2019, function(x) {
+    message(glue::glue("Getting season {x}. . ."))
+    get_season(x)
+  })
   
-})
+  saveRDS(cleaned_old, file = "data/prior_season_decisions.rds")
+  
+}
+
+# bind 2020 data to the prior season data
+cleaned_all <- bind_rows(
+  cleaned,
+  readRDS("data/prior_season_decisions.rds")
+)
+
+
+# team over time
+current <- cleaned_all %>%
+  mutate(
+    season = substr(game_id, 1, 4) %>% as.numeric()
+  ) %>%
+  filter(go_boost > 1.5) %>%
+  filter(prior_wp > .2) %>%
+  group_by(posteam, season) %>%
+  summarize(go = mean(go), n = n()) %>%
+  ungroup() %>%
+  left_join(nflfastR::teams_colors_logos, by=c('posteam' = 'team_abbr')) %>%
+  arrange(-go) %>%
+  mutate(rank = 1:n()) %>%
+  arrange(posteam, season)
+
+means <- current %>%
+  group_by(season) %>%
+  summarize(league_go = mean(go)) %>%
+  ungroup()
+
+# function to make team timeline
+make_timeline <- function(team) {
+  
+  prim <- nflfastR::teams_colors_logos %>% filter(team_abbr == team) %>% pull(team_color)
+  sec <- nflfastR::teams_colors_logos %>% filter(team_abbr == team) %>% pull(team_color2)
+  name <- nflfastR::teams_colors_logos %>% filter(team_abbr == team) %>% pull(team_nick)
+  
+  chart <- current %>%
+    filter(posteam==team)
+  teams <- current %>%
+    filter(posteam != team)
+  
+  ### pass downs over time
+  my_title <- glue::glue("How often do the <span style='color:red'>{name}</span> go for it when they <span style='color:red'>should?</span>")
+  fig <- ggplot(data=chart, aes(x=season,y=go)) +
+    geom_line(data=chart,
+              aes(x=season,y=go),color=prim,size=3) +
+    geom_point(data=chart,
+               aes(x=season,y=go),color=sec,size=8) +
+    geom_line(data=means,
+              aes(x=season,y=league_go),color="black",size=1, linetype="dashed", alpha=.6) +
+    geom_jitter(data=teams,
+                aes(x=season,y=go), color=teams$team_color, size=4, alpha=.6, width = .045) +
+    labs(
+      x = "",
+      y = "Go rate",
+      title= my_title,
+      subtitle = "When @ben_bot_baldwin recommends going for it (gain in win prob. at least 1.5 percentage points)",
+      caption = glue::glue("Sample size in parentheses\nExcl. final 30 seconds of game. Win prob >20%")
+    ) +
+    scale_x_continuous(breaks=c(min(chart$season):max(chart$season))) +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
+    theme_bw()+
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_text(size = 18),
+          panel.grid.minor.x = element_blank(),
+          axis.text.x = element_text(size=16),
+          axis.text.y = element_text(size=16),
+          plot.title = element_markdown(size=24,face = 2,hjust=.5),
+          plot.subtitle = element_text(size=12, hjust=.5))
   
   
+  ggsave(glue::glue("figures/team_timelines/teams_timeline_{team}.png"), plot = fig)
+  
+  return(fig)
+  
+}
+
+make_timeline("WAS")
 
 
