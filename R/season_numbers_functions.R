@@ -4,6 +4,9 @@ get_probs <- function(p, games) {
   
   play_data <- tibble::tibble(
     "game_id" = p$game_id,
+    "play_id" = p$play_id,
+    "season" = p$season,
+    "week" = p$week,
     "qtr" = p$qtr,
     "time" = p$quarter_seconds_remaining,
     'posteam' = p$posteam,
@@ -90,7 +93,7 @@ clean_data <- function(fourth_downs) {
       should_go = if_else(go_boost > 0, 1, 0)
     ) %>%
     select(
-      game_id, prior_wp, url, posteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
+      game_id, play_id, season, week, prior_wp, url, posteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
     ) %>%
     return()
 }
@@ -115,5 +118,70 @@ get_season <- function(s) {
   return(cleaned)
   
 }
+
+
+# wrapper function to get 4th down numbers for an ongoing season
+# the reason for the separate function is storing a file of previously-obtained
+# plays so that it doesn't have to run for the entire season every single time
+get_current_season <- function(s) {
+  
+  # read previously-saved plays if they exist
+  if (file.exists("data/current_season_decisions.rds")) {
+    message("Loading existing plays for this season")
+    existing_plays <- readRDS("data/current_season_decisions.rds")
+  } else {
+    message("No existing plays found for this season. Starting over...")
+    existing_plays <- tibble::tibble(
+      "game_id" = "XXX",
+      "play_id" = 0
+    )
+  }
+  
+  # get new plays that haven't been saved
+  plays <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_{s}.rds"))) %>%
+    prepare_data() %>%
+    left_join(
+      existing_plays %>% select(game_id, play_id) %>% mutate(already_scraped = 1), by = c("game_id", "play_id")
+    ) %>%
+    filter(is.na(already_scraped))
+  
+  
+  # if there are new plays, calculate decisions for them
+  if (nrow(plays) > 0) {
+    
+    message(glue::glue("Need to calculate probabilities for {nrow(plays)} plays"))
+    
+    # add probs to data
+    future::plan(multisession)
+    cleaned <- furrr::future_map_dfr(1 : nrow(plays), function(x) {
+      # only uncomment for debugging purposes
+      # message(glue::glue("game {plays %>% dplyr::slice(x) %>% pull(game_id)} play {plays %>% dplyr::slice(x) %>% pull(play_id)}"))
+      get_probs(plays %>% dplyr::slice(x), games)
+    }) %>%
+      clean_data()
+    
+    # add to existing plays
+    cleaned <- bind_rows(
+      existing_plays,
+      cleaned
+    ) %>%
+      # this is to drop the dummy row created if file is missing above
+      filter(!is.na(posteam))
+    
+    saveRDS(cleaned, "data/current_season_decisions.rds")
+    
+    return(cleaned)
+    
+  } else {
+    message("Nothing to do. Returning already-saved data")
+    return(existing_plays)
+  }
+  
+
+  
+  
+}
+
+
 
 

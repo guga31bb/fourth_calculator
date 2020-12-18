@@ -3,6 +3,7 @@ library(gt)
 library(future)
 library(ggtext)
 library(ggpmisc)
+library(DescTools)
 
 source('R/helpers.R')
 source("https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R")
@@ -12,9 +13,11 @@ source('R/season_numbers_functions.R')
 # the first part: numbers for one season only (2020 here)
 # get list of plays
 
-# which season do you want?
-# note: this will take a few minutes
-cleaned <- get_season(2020)
+# new addition 18 dec 2020: current season function which saves calculations that have been done already
+# so if you run this one week and again the next week, it will only have to do calculations for the new games
+# do not use this function with older seasons, use get_season as shown below
+# or just load the data i already provide in this repo
+cleaned <- get_current_season(2020)
 
 # **************************************************************************************
 # decision-making table
@@ -94,11 +97,12 @@ t <- cleaned %>%
   ) %>%
   arrange(-go_boost) %>%
   head(5) %>%
-  select(posteam, defteam, qtr, ydstogo, go_boost, desc) %>%
+  select(posteam, defteam, week, qtr, ydstogo, go_boost, desc) %>%
   gt() %>%
   cols_label(
     posteam = "Team",
     defteam = "Opp.",
+    week = "Week",
     qtr = "Qtr",
     ydstogo = "Yds to go",
     desc = "Play",
@@ -139,6 +143,7 @@ t
 
 t %>% gtsave("figures/team_worst.png")
 
+# take a look at the worst decisions
 cleaned %>%
   filter(
     play_type != "PENALTY",
@@ -149,22 +154,24 @@ cleaned %>%
   ) %>%
   arrange(-go_boost) %>%
   head(5) %>% 
-  select(game_id, url)
+  select(game_id, url, go_boost, desc)
 
 
 # **************************************************************************************
-# team results
+# league behavior by co recommendation
 
 my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>")
 plot <- cleaned %>%
-  filter(prior_wp > .05 & prior_wp < .95) %>%
-  mutate(go_boost = round(go_boost, 0)) %>%
+  # filter(prior_wp > .05 & prior_wp < .95) %>%
+  mutate(go_boost = RoundTo(go_boost, 0.5)) %>%
   group_by(go_boost) %>%
   summarize(go = 100 * mean(go)) %>%
   ungroup() %>%
   filter(between(go_boost, -10, 10)) %>%
   mutate(
-    should_go = if_else(go_boost >= 0, 1, 0)
+    should_go = case_when(go_boost > .5 ~ 1,
+                          go_boost < -.5 ~ 0,
+                          TRUE ~ 2)
   )
 
 plot %>%
@@ -175,7 +182,7 @@ plot %>%
   theme_bw()+
   labs(x = "Gain in win probability by going for it",
        y = "Go-for-it percentage",
-       caption = paste0("Figure: @benbbaldwin | Win prob between 5% and 95%"),
+       caption = paste0("Figure: @benbbaldwin"),
        subtitle = "By strength of @ben_bot_baldwin recommendation, 2020",
        title = my_title) +
   theme(
@@ -184,11 +191,11 @@ plot %>%
     plot.subtitle = element_markdown(size = 12, hjust = 0.5)
   ) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 20)) +
-  annotate("text",x=-4, y= 90, label = "Should\nkick", color="red", size = 5) +
-  annotate("text",x=3, y= 90, label = "Should\ngo for it", color="red", size = 5) +
-  annotate("label",x=-6, y= 15, label = "Teams almost always kick\nwhen they should...", size = 5) +
-  annotate("label",x=6, y= 25, label = "...but frequently\n kick when they\nshould go for it", size = 5)
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(-10, 10), expand = c(0,0)) +
+  annotate("text",x=-4, y= 90, label = "Should\nkick", color="red", size = 7) +
+  annotate("text",x=3, y= 90, label = "Should\ngo for it", color="red", size = 7) +
+  annotate("label",x=-6, y= 15, label = "Teams almost always kick\nwhen they should...", size = 6) +
+  annotate("label",x=6, y= 25, label = "...but frequently\n kick when they\nshould go for it", size = 6)
   
 ggsave("figures/league_behavior.png")
 
@@ -227,7 +234,7 @@ ggsave("figures/league_behavior_wp.png")
 # ###################################################### #######################
 # ############## team bar chart
 current <- cleaned %>%
-  filter(go_boost > 2) %>%
+  filter(go_boost > 1.5) %>%
   filter(prior_wp > .2) %>%
   group_by(posteam) %>%
   summarize(go = mean(go), n = n()) %>%
@@ -276,7 +283,7 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
     x = "",
     y = "Go rate",
     title= my_title,
-    subtitle = "When @ben_bot_baldwin recommends going for it (gain in win prob. at least 2 percentage points)",
+    subtitle = "When @ben_bot_baldwin recommends going for it (gain in win prob. at least 1.5 percentage points)",
     caption = glue::glue("Sample size in parentheses\nExcl. final 30 seconds of game. Win prob >20%")
   ) +
   geom_text(data = current, aes(x = rank, y = -.015, size=.04, label = glue::glue("({n})")), show.legend = FALSE, nudge_x = 0, color="black")
@@ -294,7 +301,6 @@ current <- cleaned %>%
   arrange(-go) %>%
   mutate(rank = 1:n()) %>%
   arrange(posteam)
-
 
 logos <- tibble(
   x = current$rank + .25, 
@@ -408,7 +414,7 @@ make_timeline <- function(team) {
       y = "Go rate",
       title= my_title,
       subtitle = "When @ben_bot_baldwin recommends going for it (gain in win prob. at least 1.5 percentage points)",
-      caption = glue::glue("Sample size in parentheses\nExcl. final 30 seconds of game. Win prob >20%")
+      caption = glue::glue("Excl. final 30 seconds of game. Win prob >20%")
     ) +
     scale_x_continuous(breaks=c(min(chart$season):max(chart$season))) +
     scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
@@ -428,6 +434,6 @@ make_timeline <- function(team) {
   
 }
 
-make_timeline("WAS")
+make_timeline("NO")
 
 
