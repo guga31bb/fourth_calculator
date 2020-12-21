@@ -5,9 +5,56 @@ source('https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_n
 
 set.seed(2013)
 
+# read in data from data repo
+# just doing 20 season to make fold splitting easier
+pbp_data <- purrr::map_df(2000 : 2019, function(x) {
+  readRDS(
+    # from repo
+    url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_{x}.rds"))
+  ) %>% filter(qtr > 4)
+}) %>%
+  mutate(
+    Winner = if_else(home_score > away_score, home_team,
+                     if_else(home_score < away_score, away_team, "TIE"))
+  )
+
+#for estimating the models, apply some filters
+pbp_data <- pbp_data %>%
+  filter(play_type %in% c("field_goal", "no_play", "pass", "punt", "run",
+                          "qb_spike") & is.na(two_point_conv_result) & is.na(extra_point_result) &
+           !is.na(down) & !is.na(game_seconds_remaining)) %>%
+  #to keep file size manageable
+  select(
+    game_id,
+    game_seconds_remaining,
+    quarter_seconds_remaining,
+    yardline_100,
+    fixed_drive,
+    roof,
+    posteam,
+    defteam,
+    home_team,
+    ydstogo,
+    season,
+    qtr,
+    down,
+    week,
+    ep,
+    score_differential,
+    posteam_timeouts_remaining,
+    defteam_timeouts_remaining,
+    desc,
+    Winner,
+    spread_line,
+    total_line
+  )
+
+#for doing calibation etc
+saveRDS(pbp_data, 'data/cal_data_overtime.rds')
+
+
 model_data <-
-  readRDS('../nflfastR-data/models/cal_data_overtime.rds') %>%
-  # readRDS(url('https://github.com/guga31bb/nflfastR-data/blob/master/models/cal_data.rds?raw=true')) %>%
+  readRDS('data/cal_data_overtime.rds') %>%
   make_model_mutations() %>%
   prepare_wp_data() %>%
   mutate(
@@ -25,7 +72,12 @@ model_data <-
   ) %>%
   group_by(game_id) %>%
   mutate(
-    first_ot_drive = if_else(fixed_drive == min(fixed_drive), 1, 0)
+    first_ot_drive = if_else(fixed_drive == min(fixed_drive), 1, 0),
+    # if team is in field goal range and can win game with field goal
+    can_win = if_else(
+      (first_ot_drive == 0 | regime == 0) & yardline_100 < 35 & score_differential == 0,
+      1, 0
+    )
   ) %>%
   ungroup() %>%
   filter(!is.na(ep) & !is.na(score_differential) & !is.na(label) & !is.na(yardline_100)) %>%
@@ -34,6 +86,7 @@ model_data <-
     # just for checking data
     # game_id, posteam, Winner,
     first_ot_drive,
+    can_win,
     regime,
     spread_time,
     game_type_reg,
@@ -155,21 +208,22 @@ results %>%
   theme_minimal()
 
 results %>% arrange(logloss) %>% dplyr::slice(1)
+results %>% arrange(logloss) %>% dplyr::slice(1) %>% dplyr::pull(logloss)
+# [1] 0.7530039
 
-
-nrounds <- 1423
+nrounds <- 1040
 params <-
   list(
     booster = "gbtree",
     objective = "multi:softprob",
     eval_metric = c("mlogloss"),
     num_class = 3,
-    eta = 0.00494,
-    gamma = 0.000313,
+    eta = 0.00738,
+    gamma = 0.271,
     subsample= 0.965,
-    colsample_bytree= 0.417,
+    colsample_bytree= 0.462,
     max_depth = 2,
-    min_child_weight = 22
+    min_child_weight = 14
   )
 
 wp_model_ot <- xgboost::xgboost(params = params, data = full_train, nrounds = nrounds, verbose = 2)

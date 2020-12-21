@@ -802,7 +802,11 @@ calculate_win_probability_ot <- function(pbp_data) {
         # since this can only be used 2014 - present
         regime = 0,
         game_type_reg = if_else(type == "reg", 1, 0),
-        quarter_seconds_remaining = half_seconds_remaining
+        quarter_seconds_remaining = half_seconds_remaining,
+        can_win = if_else(
+          (first_ot_drive == 0 | regime == 0) & yardline_100 < 35 & score_differential == 0,
+          1, 0
+        )
       )
   )
   
@@ -810,6 +814,7 @@ calculate_win_probability_ot <- function(pbp_data) {
     model_data %>%
       select(
         first_ot_drive,
+        can_win,
         regime,
         spread_time,
         game_type_reg,
