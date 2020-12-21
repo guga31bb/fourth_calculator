@@ -68,6 +68,12 @@ ui <- function(request) {
                                                 label = "Did home team get opening kickoff?:",
                                                 choices = list("0" = 0, "1" = 1),
                                                 inline = T,
+                                                selected = "0"),
+                                   
+                                   radioButtons("first_ot_drive",
+                                                label = "Is this the first drive of OT?:",
+                                                choices = list("0" = 0, "1" = 1),
+                                                inline = T,
                                                 selected = "0")
                                    
                                    
@@ -77,7 +83,7 @@ ui <- function(request) {
                                    tags$h3("Time"),
                                    radioButtons("qtr",
                                                 label = "Quarter:",
-                                                choices = list("1" = 1, "2" = 2, "3" = 3, "4" = 4),
+                                                choices = list("1" = 1, "2" = 2, "3" = 3, "4" = 4, "5" = 5),
                                                 inline = T,
                                                 selected = "4"),
                                    
@@ -252,17 +258,18 @@ server <- function(session, input, output) {
   # uncomment only for testing
   # input <- NULL
   # input$qtr <- 4
-  # input$mins <- 2
-  # input$secs <- 0
-  # input$posteam <- "MIN"
-  # input$away <- "MIN"
-  # input$home <- "SEA"
-  # input$yardline <- 6
-  # input$ydstogo <- 1
+  # input$mins <- 3
+  # input$secs <- 22
+  # input$posteam <- "LV"
+  # input$away <- "LAC"
+  # input$home <- "LV"
+  # input$yardline <- 5
+  # input$ydstogo <- 5
   # input$posteam_to <- 2
   # input$defteam_to <- 1
   # input$home_ko <- 0
-  # input$score_diff <- 5
+  # input$first_ot_drive <- 1
+  # input$score_diff <- 0
   # input$type <- "reg"
   # input$runoff <- 0
   # input$season <- 2020
@@ -285,6 +292,7 @@ server <- function(session, input, output) {
         'posteam_timeouts_remaining' = as.integer(input$posteam_to),
         'defteam_timeouts_remaining' = as.integer(input$defteam_to),
         'home_opening_kickoff' = as.integer(input$home_ko),
+        'first_ot_drive' = as.integer(input$first_ot_drive),
         'score_differential' = as.integer(input$score_diff),
         'runoff' = as.integer(input$runoff),
         'yr' = as.integer(input$season)

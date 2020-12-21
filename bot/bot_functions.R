@@ -61,7 +61,7 @@ get_data <- function(df) {
             desc = text,
             time = clock_display_value
           ) %>% 
-          dplyr::filter(qtr <= 4) %>%
+          # dplyr::filter(qtr <= 4) %>%
           dplyr::mutate(
             # time column is wacky so extract it from play description when possible
             play_time = stringr::str_extract(desc, "\\([^()]+(?=\\)\\s)"),
@@ -84,7 +84,7 @@ get_data <- function(df) {
               TRUE ~ posteam
             ),
             defteam = if_else(posteam == home_team, away_team, home_team),
-            half = if_else(qtr <= 2, 1, 2),
+            half = case_when(qtr <= 2 ~ 1, between(qtr, 3, 4) ~ 2, qtr > 4 ~ 3),
             challenge_team = stringr::str_extract(desc, "[:alpha:]*\\s*[:alpha:]*\\s*[:alpha:]*[:alpha:]+(?=\\schallenged)"),
             challenge_team = stringr::str_replace_all(challenge_team, "[\r\n]" , ""),
             challenge_team = stringr::str_trim(challenge_team, side = c("both")),
@@ -145,8 +145,8 @@ get_data <- function(df) {
               timeout_team != away_team ~ 0,
               is.na(timeout_team) ~ 0
             ),
-            home_timeouts_remaining = 3,
-            away_timeouts_remaining = 3
+            home_timeouts_remaining = if_else(half < 3, 3, 2),
+            away_timeouts_remaining = if_else(half < 3, 3, 2)
           ) %>%
           dplyr::group_by(half) %>%
           arrange(qtr, desc(mins), desc(secs), id) %>%
@@ -178,9 +178,10 @@ get_data <- function(df) {
             week = week,
             type = if_else(week <= 17, "reg", "post")
           ) %>%
+          add_ot_drive() %>%
           filter(
             down == 4, 
-            !(time < 30 & qtr %in% c(4)),
+            !(time < 30 & qtr %in% c(4, 5)),
             is.na(timeout_team),
             type_text != "Two-minute warning",
             type_text != "End Period"
@@ -229,6 +230,7 @@ get_data <- function(df) {
             posteam_timeouts_remaining,
             defteam_timeouts_remaining,
             home_opening_kickoff,
+            first_ot_drive,
             score_differential,
             runoff,
             home_score,
@@ -275,6 +277,33 @@ get_data <- function(df) {
     return(plays)
 }
 
+# need to get first_ot_drive, an indicator for whether it's the first drive of overtime
+add_ot_drive <- function(df) {
+  
+  df %>%
+    group_by(half) %>%
+    mutate(
+      row = 1:dplyr::n(),
+      new_drive = dplyr::if_else(
+        # change in posteam
+        posteam != dplyr::lag(posteam) |
+          # change in posteam in t-2 and na posteam in t-1
+          (posteam != dplyr::lag(posteam, 2) & is.na(dplyr::lag(posteam))) |
+          # change in posteam in t-3 and na posteam in t-1 and t-2
+          (posteam != dplyr::lag(posteam, 3) & is.na(dplyr::lag(posteam, 2)) & is.na(dplyr::lag(posteam))),
+        1, 0
+      ),
+      # first observation of a half is also a new drive
+      new_drive = dplyr::if_else(row == 1, 1,new_drive),
+      # if there's a missing, make it not a new drive (0)
+      new_drive = dplyr::if_else(is.na(new_drive), 0, new_drive),
+      drive = cumsum(new_drive),
+      first_ot_drive = if_else(qtr == 5 & drive == 1, 1, 0)
+    ) %>%
+    ungroup() %>%
+    return()
+}
+
 
 # function to tweet out one play
 tweet_play <- function(df) {
@@ -318,8 +347,15 @@ tweet_play <- function(df) {
   confidence <- case_when(
     abs(diff) < 1 ~ "",
     abs(diff) >= 1 & abs(diff) < 3 ~ "(MEDIUM)",
-    abs(diff) >= 3 & abs(diff) <= 10 ~ "(STRONG)",
-    abs(diff) > 10 ~ "(VERY STRONG)"
+    abs(diff) >= 3 & abs(diff) <= 5 ~ "(STRONG)",
+    abs(diff) >= 5 & abs(diff) <= 10 ~ "(VERY STRONG)",
+    abs(diff) > 10 ~ "(YOU BETTER DO THIS)"
+  )
+  
+  confidence <- if_else(
+    confidence == "(MEDIUM)" & abs(wp1 / wp2) > 1.2,
+    "(STRONG)",
+    confidence
   )
   
   position <- if_else(

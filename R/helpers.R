@@ -19,6 +19,9 @@ load('data/fd_model.Rdata', .GlobalEnv)
 # 2pt model
 load('data/two_pt_model.Rdata', .GlobalEnv)
 
+# for go for it model
+load('data/wp_model_ot.Rdata', .GlobalEnv)
+
 suppressWarnings(
   # load games file for getting game total, point spread, and roof
   games <- readRDS(url("https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true")) %>%
@@ -116,6 +119,7 @@ flip_team <- function(df) {
         qtr <= 2 & receive_2h_ko == 1 ~ 0,
         TRUE ~ receive_2h_ko
       ),
+      first_ot_drive = 0,
       # switch posteam
       posteam = if_else(home_team == posteam, away_team, home_team)
     )
@@ -180,7 +184,7 @@ get_fg_wp <- function(df) {
     # for end of 1st half stuff
     flip_half() %>%
     nflfastR::calculate_expected_points() %>%
-    nflfastR::calculate_win_probability() %>%
+    calculate_wp() %>%
     mutate(
       
       # fill in end of game situation when team can kneel out clock
@@ -190,8 +194,11 @@ get_fg_wp <- function(df) {
         score_differential > 0 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 1,
         score_differential > 0 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
         TRUE ~ vegas_wp
+      ),
+      # if it wasn't the opening drive and the other team just kicked a FG, game is over
+      vegas_wp = if_else(
+        df$first_ot_drive == 0 & qtr > 4 & score_differential < 0, 0, vegas_wp
       )
-      
     ) %>%
     pull(vegas_wp)
   
@@ -207,7 +214,7 @@ get_fg_wp <- function(df) {
     # for end of 1st half stuff
     flip_half() %>%
     nflfastR::calculate_expected_points() %>%
-    nflfastR::calculate_win_probability() %>%
+    calculate_wp() %>%
     mutate(
       
       # fill in end of game situation when team can kneel out clock
@@ -296,7 +303,7 @@ get_punt_wp <- function(df, punt_df) {
     # have to flip bc other team
     1 - probs %>%
       nflfastR::calculate_expected_points() %>%
-      nflfastR::calculate_win_probability() %>%
+      calculate_wp() %>%
       mutate(
         # for the punt return TD case
         vegas_wp = if_else(yardline_after == 100 | muff == 1, 1 - vegas_wp, vegas_wp),
@@ -359,6 +366,8 @@ get_go_wp <- function(df) {
       defeam_timeouts_pre = defteam_timeouts_remaining,
       turnover = dplyr::if_else(gain < ydstogo, as.integer(1), as.integer(0)),
       down = 1,
+      # save whether TD was scored for OT model later
+      td = if_else(yardline_100 == 0, 1, 0),
       # possession change if 4th down failed or touchodwn
       # flip yardline_100, timeouts, and score for turnovers
       yardline_100 = dplyr::if_else(turnover == 1, as.integer(100 - yardline_100), as.integer(yardline_100)),
@@ -397,7 +406,8 @@ get_go_wp <- function(df) {
         away_team == posteam & (turnover == 1 | yardline_100 == 0) ~ home_team,
         TRUE ~ posteam
       ),
-      
+      # regardless of what happens, a following drive won't be first_ot_drive
+      first_ot_drive = 0,
       # deal with touchdown: swap score diff and take off 7 points
       score_differential = if_else(yardline_100 == 0, as.integer(-score_differential - 7), as.integer(score_differential)),
       # assume touchback after kick
@@ -405,7 +415,7 @@ get_go_wp <- function(df) {
     ) %>%
     flip_half() %>%
     nflfastR::calculate_expected_points() %>%
-    nflfastR::calculate_win_probability() %>%
+    calculate_wp() %>%
     mutate(
       # flip for possession change (turnover or td)
       vegas_wp = if_else(posteam != df$posteam, 1 - vegas_wp, vegas_wp),
@@ -422,6 +432,10 @@ get_go_wp <- function(df) {
         score_differential > 0 & turnover == 1 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 0,
         score_differential > 0 & turnover == 1 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 0,
         TRUE ~ vegas_wp
+      ),
+      # fill in wp for winning touchdown
+      vegas_wp = if_else(
+        td == 1 & qtr > 4, 1, vegas_wp
       )
     ) %>%
     mutate(wt_wp = prob * vegas_wp) 
@@ -638,7 +652,7 @@ get_2pt_wp <- function(df) {
     spread_line = df$spread_line
   ) %>%
     nflfastR::calculate_expected_points() %>%
-    nflfastR::calculate_win_probability() %>%
+    calculate_wp() %>%
     pull(vegas_wp)
   
   # xp wp
@@ -774,3 +788,67 @@ make_table_2pt <- function(df, current_situation) {
 }
 
 
+
+# win prob calculator for ot
+calculate_win_probability_ot <- function(pbp_data) {
+  suppressWarnings(
+    model_data <- pbp_data %>%
+      # drop existing values of ep and the probs before making new ones
+      dplyr::mutate(
+        home = dplyr::if_else(.data$posteam == .data$home_team, 1, 0),
+        posteam_spread = dplyr::if_else(.data$home == 1, .data$spread_line, -1 * .data$spread_line),
+        elapsed_share = (3600 - .data$game_seconds_remaining) / 3600,
+        spread_time = .data$posteam_spread * exp(-4 * .data$elapsed_share),
+        # since this can only be used 2014 - present
+        regime = 0,
+        game_type_reg = if_else(type == "reg", 1, 0),
+        quarter_seconds_remaining = half_seconds_remaining
+      )
+  )
+  
+  probs <- stats::predict(wp_model_ot, as.matrix(
+    model_data %>%
+      select(
+        first_ot_drive,
+        regime,
+        spread_time,
+        game_type_reg,
+        home,
+        quarter_seconds_remaining,
+        score_differential,
+        down,
+        ydstogo,
+        yardline_100,
+        posteam_timeouts_remaining,
+        defteam_timeouts_remaining
+      )
+    ), ncol=3, byrow=TRUE) %>%
+    tibble::as_tibble() 
+  
+  pbp_data %>%
+    mutate(
+      vegas_wp = probs %>% dplyr::slice(1) %>% pull(value) + .5 * probs %>% dplyr::slice(3) %>% pull(value)
+    ) %>%
+    return()
+
+}
+
+
+calculate_wp <- function(data) {
+  
+  if (min(data$qtr <= 4)) {
+    
+    nflfastR::calculate_win_probability(data) %>%
+      return()
+    
+  } else {
+    calculate_win_probability_ot(data) %>%
+      return()
+  }
+  
+  
+}
+
+
+# need to fix this to figure out opening ot drive
+# https://github.com/guga31bb/box_scores/blob/master/functions.R#L59
