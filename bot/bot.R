@@ -32,6 +32,9 @@ live_games <- readRDS(url(
     espn = dplyr::case_when(
       game_id == "2020_07_PIT_TEN" ~ "401249063",
       game_id == "2020_10_WAS_DET" ~ "401220289",
+      game_id == "2020_18_IND_BUF" ~ "401220393",
+      game_id == "2020_18_LA_SEA" ~ "401220372",
+      game_id == "2020_18_TB_WAS" ~ "401220371",
       TRUE ~ espn
       )
     ) %>%
