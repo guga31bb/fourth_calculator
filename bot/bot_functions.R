@@ -286,7 +286,7 @@ tweet_play <- function(df) {
   
   play_desc <- df$desc %>%
     stringr::str_replace("\\([:digit:]*\\:[:digit:]+\\)\\s", "") %>%
-    substr(1, 80)
+    substr(1, 100)
   
   choice_emoji <- dplyr::case_when(
     # football to punt
