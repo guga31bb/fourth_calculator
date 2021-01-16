@@ -32,12 +32,18 @@ live_games <- readRDS(url(
     espn = dplyr::case_when(
       game_id == "2020_07_PIT_TEN" ~ "401249063",
       game_id == "2020_10_WAS_DET" ~ "401220289",
+      # wc playoffs
       game_id == "2020_18_IND_BUF" ~ "401220393",
-      game_id == "2020_18_LA_SEA" ~ "401220372",
-      game_id == "2020_18_TB_WAS" ~ "401220371",
+      game_id == "2020_18_LA_SEA"  ~ "401220372",
+      game_id == "2020_18_TB_WAS"  ~ "401220371",
       game_id == "2020_18_BAL_TEN" ~ "401220396",
-      game_id == "2020_18_CHI_NO" ~ "401220395",
+      game_id == "2020_18_CHI_NO"  ~ "401220395",
       game_id == "2020_18_CLE_PIT" ~ "401220394",
+      # div playoffs
+      game_id == "2020_19_LA_GB"   ~ "401220398",
+      game_id == "2020_19_BAL_BUF" ~ "401220397",
+      game_id == "2020_19_CLE_KC"  ~ "401220400",
+      game_id == "2020_19_TB_NO"   ~ "401220399",
       TRUE ~ espn
       )
     ) %>%
