@@ -1,3 +1,5 @@
+message(glue::glue("------------------------------------------{lubridate::now()}"))
+
 source('bot/bot_functions.R')
 
 # get live games
