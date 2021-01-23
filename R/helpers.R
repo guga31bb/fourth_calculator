@@ -243,81 +243,102 @@ get_fg_wp <- function(df) {
 # function for punt wp
 get_punt_wp <- function(df, punt_df) {
   
-  # get the distribution at a yard line from punt data
-  punt_probs <- punt_df %>%
-    filter(yardline_100 == df$yardline_100) %>%
-    select(yardline_after, pct, muff)
-  
-  if (nrow(punt_probs) > 0) {
+  # special case for end of half: just assume half ends on punt
+  if (df$qtr == 2 & df$half_seconds_remaining <= 6) {
     
-    # get punt df
-    probs <- punt_probs %>%
-      bind_cols(df[rep(1, nrow(punt_probs)), ]) %>%
-      flip_team() %>%
-      mutate(
-        yardline_100 = 100 - yardline_after,
-        
-        # deal with punt return TD (yardline_after == 100)
-        # we want punting team to be receiving a kickoff so have to flip everything back
-        posteam = if_else(yardline_after == 100, df$posteam, posteam),
-        yardline_100 = if_else(yardline_after == 100, as.integer(75), as.integer(yardline_100)),
-        posteam_timeouts_remaining = dplyr::if_else(yardline_after == 100,
-                                                    df$posteam_timeouts_remaining,
-                                                    posteam_timeouts_remaining),
-        defteam_timeouts_remaining = dplyr::if_else(yardline_after == 100,
-                                                    df$defteam_timeouts_remaining,
-                                                    defteam_timeouts_remaining),
-        score_differential = if_else(yardline_after == 100, as.integer(-score_differential - 7), as.integer(score_differential)),
-        receive_2h_ko = case_when(
-          qtr <= 2 & receive_2h_ko == 0 & (yardline_after == 100) ~ 1,
-          qtr <= 2 & receive_2h_ko == 1 & (yardline_after == 100) ~ 0,
-          TRUE ~ receive_2h_ko
-        ),
-        
-        # now deal with muffed punts (fumble lost)
-        # again we need to flip everything back
-        posteam = if_else(muff == 1, df$posteam, posteam),
-        yardline_100 = if_else(muff == 1, as.integer(100 - yardline_100), yardline_100),
-        posteam_timeouts_remaining = dplyr::if_else(muff == 1,
-                                                    df$posteam_timeouts_remaining,
-                                                    posteam_timeouts_remaining),
-        defteam_timeouts_remaining = dplyr::if_else(muff == 1,
-                                                    df$defteam_timeouts_remaining,
-                                                    defteam_timeouts_remaining),
-        score_differential = if_else(muff == 1, as.integer(-score_differential), as.integer(score_differential)),
-        receive_2h_ko = case_when(
-          qtr <= 2 & receive_2h_ko == 0 & (muff == 1) ~ 1,
-          qtr <= 2 & receive_2h_ko == 1 & (muff == 1) ~ 0,
-          TRUE ~ receive_2h_ko
-        ),
-        ydstogo = if_else(yardline_100 < 10, yardline_100, as.integer(ydstogo))
-      )
-    
-    # have to flip bc other team
-    1 - probs %>%
-      nflfastR::calculate_expected_points() %>%
+    prob <- 1 - df %>%
+      mutate(half_seconds_remaining = 0) %>%
+      flip_half() %>%
       nflfastR::calculate_win_probability() %>%
-      mutate(
-        # for the punt return TD case
-        vegas_wp = if_else(yardline_after == 100 | muff == 1, 1 - vegas_wp, vegas_wp),
-        
-        # fill in end of game situation when team can kneel out clock
-        # discourages punting when the other team can end the game
-        vegas_wp = case_when(
-          score_differential > 0 & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 1,
-          score_differential > 0 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 1,
-          score_differential > 0 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
-          TRUE ~ vegas_wp
-        ),
-        
-        wt_wp = pct * vegas_wp
-      ) %>%
-      summarize(wp = sum(wt_wp)) %>%
-      pull(wp) %>%
-      return()
+      pull(vegas_wp)
+    
+    # in case same team gets ball again
+    if (df %>% flip_team() %>% flip_half() %>% pull(posteam) == df$posteam) {
+      prob <- 1 - prob
+    }
+    
+    return(prob)
+    
   } else {
-    # message("Too close for punting")
-    return(NA_real_)
+    
+    # get the distribution at a yard line from punt data
+    punt_probs <- punt_df %>%
+      filter(yardline_100 == df$yardline_100) %>%
+      select(yardline_after, pct, muff)
+    
+    if (nrow(punt_probs) > 0) {
+      
+      # get punt df
+      probs <- punt_probs %>%
+        bind_cols(df[rep(1, nrow(punt_probs)), ]) %>%
+        flip_team() %>%
+        mutate(
+          yardline_100 = 100 - yardline_after,
+          
+          # deal with punt return TD (yardline_after == 100)
+          # we want punting team to be receiving a kickoff so have to flip everything back
+          posteam = if_else(yardline_after == 100, df$posteam, posteam),
+          yardline_100 = if_else(yardline_after == 100, as.integer(75), as.integer(yardline_100)),
+          posteam_timeouts_remaining = dplyr::if_else(yardline_after == 100,
+                                                      df$posteam_timeouts_remaining,
+                                                      posteam_timeouts_remaining),
+          defteam_timeouts_remaining = dplyr::if_else(yardline_after == 100,
+                                                      df$defteam_timeouts_remaining,
+                                                      defteam_timeouts_remaining),
+          score_differential = if_else(yardline_after == 100, as.integer(-score_differential - 7), as.integer(score_differential)),
+          receive_2h_ko = case_when(
+            qtr <= 2 & receive_2h_ko == 0 & (yardline_after == 100) ~ 1,
+            qtr <= 2 & receive_2h_ko == 1 & (yardline_after == 100) ~ 0,
+            TRUE ~ receive_2h_ko
+          ),
+          
+          # now deal with muffed punts (fumble lost)
+          # again we need to flip everything back
+          posteam = if_else(muff == 1, df$posteam, posteam),
+          yardline_100 = if_else(muff == 1, as.integer(100 - yardline_100), yardline_100),
+          posteam_timeouts_remaining = dplyr::if_else(muff == 1,
+                                                      df$posteam_timeouts_remaining,
+                                                      posteam_timeouts_remaining),
+          defteam_timeouts_remaining = dplyr::if_else(muff == 1,
+                                                      df$defteam_timeouts_remaining,
+                                                      defteam_timeouts_remaining),
+          score_differential = if_else(muff == 1, as.integer(-score_differential), as.integer(score_differential)),
+          receive_2h_ko = case_when(
+            qtr <= 2 & receive_2h_ko == 0 & (muff == 1) ~ 1,
+            qtr <= 2 & receive_2h_ko == 1 & (muff == 1) ~ 0,
+            TRUE ~ receive_2h_ko
+          ),
+          ydstogo = if_else(yardline_100 < 10, yardline_100, as.integer(ydstogo))
+        ) %>%
+        flip_half()
+      
+      # have to flip bc other team
+      1 - probs %>%
+        nflfastR::calculate_expected_points() %>%
+        nflfastR::calculate_win_probability() %>%
+        mutate(
+          # for the punt return TD case
+          vegas_wp = if_else((yardline_after == 100 | muff == 1), 1 - vegas_wp, vegas_wp),
+          
+          # fill in end of game situation when team can kneel out clock
+          # discourages punting when the other team can end the game
+          vegas_wp = case_when(
+            score_differential > 0 & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 1,
+            score_differential > 0 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 1,
+            score_differential > 0 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
+            TRUE ~ vegas_wp
+          ),
+          
+          wt_wp = pct * vegas_wp
+        ) %>%
+        summarize(wp = sum(wt_wp)) %>%
+        pull(wp) %>%
+        return()
+    } else {
+      # message("Too close for punting")
+      return(NA_real_)
+    }
+    
   }
   
 }
