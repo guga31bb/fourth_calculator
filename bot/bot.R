@@ -46,6 +46,8 @@ live_games <- readRDS(url(
       game_id == "2020_19_BAL_BUF" ~ "401220397",
       game_id == "2020_19_CLE_KC"  ~ "401220400",
       game_id == "2020_19_TB_NO"   ~ "401220399",
+      game_id == "2020_20_TB_GB"   ~ "401220402",
+      game_id == "2020_20_BUF_KC"  ~ "401220401"
       TRUE ~ espn
       )
     ) %>%
