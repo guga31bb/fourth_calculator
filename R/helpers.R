@@ -353,6 +353,19 @@ get_go_wp <- function(df) {
       retractable,  dome,    posteam_spread, total_line,  posteam_total 
     )
   
+  td_probs <- get_2pt_wp(
+    df %>% mutate(
+      score_differential = score_differential + 6,
+      half_seconds_remaining = half_seconds_remaining - 6,
+      game_seconds_remaining = game_seconds_remaining - 6,
+      half_seconds_remaining = if_else(half_seconds_remaining < 0, 0, half_seconds_remaining),
+      game_seconds_remaining = if_else(game_seconds_remaining < 0, 0, game_seconds_remaining)
+    )
+  )
+  
+  td_2 <- td_probs$`WP 2pt`
+  td_1 <- td_probs$`WP kick`
+  
   # get model output from situation
   preds <- stats::predict(
     fd_model,
@@ -419,6 +432,7 @@ get_go_wp <- function(df) {
         TRUE ~ posteam
       ),
       
+      original_yardline = yardline_100,
       # deal with touchdown: swap score diff and take off 7 points
       score_differential = if_else(yardline_100 == 0, as.integer(-score_differential - 7), as.integer(score_differential)),
       # assume touchback after kick
@@ -443,7 +457,9 @@ get_go_wp <- function(df) {
         score_differential > 0 & turnover == 1 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 0,
         score_differential > 0 & turnover == 1 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 0,
         TRUE ~ vegas_wp
-      )
+      ),
+      # if a team is down by 8 with less than 10 minutes left and they score a TD, make them go for 2
+      vegas_wp = if_else(game_seconds_remaining < 600 & original_yardline == 0 & df$score_differential == -8, td_2, vegas_wp)
     ) %>%
     mutate(wt_wp = prob * vegas_wp) 
   
