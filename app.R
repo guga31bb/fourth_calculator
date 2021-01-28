@@ -135,7 +135,7 @@ ui <- function(request) {
                                      inputId =  "score_diff", 
                                      label = "Score differential:", 
                                      min = -28, max = 28,
-                                     value = -2
+                                     value = -1
                                    ),
                                    
                                    sliderInput(
@@ -252,21 +252,21 @@ server <- function(session, input, output) {
   # uncomment only for testing
   # input <- NULL
   # input$qtr <- 4
-  # input$mins <- 2
-  # input$secs <- 0
-  # input$posteam <- "MIN"
-  # input$away <- "MIN"
-  # input$home <- "SEA"
-  # input$yardline <- 6
+  # input$mins <- 4
+  # input$secs <- 52
+  # input$posteam <- "TB"
+  # input$away <- "TB"
+  # input$home <- "CHI"
+  # input$yardline <- 7
   # input$ydstogo <- 1
-  # input$posteam_to <- 2
-  # input$defteam_to <- 1
+  # input$posteam_to <- 3
+  # input$defteam_to <- 3
   # input$home_ko <- 0
-  # input$score_diff <- 5
+  # input$score_diff <- -1
   # input$type <- "reg"
   # input$runoff <- 0
   # input$season <- 2020
-  # 
+  #
 
   # get the situation from user input
   fullInput <- eventReactive(
@@ -324,7 +324,7 @@ server <- function(session, input, output) {
     expr = make_table_2pt(tableData2(), fullInput())
   )
 
-    # for the team logo above decision
+  # for the team logo above decision
   output$picture <-
     renderText({
       c(
