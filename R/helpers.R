@@ -36,6 +36,7 @@ suppressWarnings(
 )
 
 # data prep function
+# games is the games file read above
 prepare_df <- function(df, games) {
   
   home <- df$home_team
@@ -72,8 +73,10 @@ prepare_df <- function(df, games) {
       game_seconds_remaining = if_else(qtr <= 2, half_seconds_remaining + 1800, half_seconds_remaining),
       model_roof = roof,
       # for now, assume that people are using the calculator for 2014 to present
+      # this is for the go-for-it model
       era3 = dplyr::if_else(season > 2013 & season <= 2017, 1, 0),
       era4 = dplyr::if_else(season > 2017, 1, 0),
+      # for field goal model
       era = 3,
       posteam_spread = if_else(posteam == home_team, spread_line, -spread_line),
       home_total = (total_line + spread_line) / 2,
@@ -122,12 +125,13 @@ flip_team <- function(df) {
   
 }
 
-# function to move the game to start of 3rd Q on an end-of-half play
+# helper function to move the game to start of 3rd Q on an end-of-half play
 flip_half <- function(df) {
   
-  # make game touchback after opening kickoff
+  # make half touchback after opening kickoff
   for_return <- df %>%
     mutate(
+      # figure out which team gets the ball
       posteam = case_when(
         home_opening_kickoff == 1 ~ away_team,
         home_opening_kickoff == 0 ~ home_team
@@ -145,6 +149,8 @@ flip_half <- function(df) {
       )
     )
   
+  # this helps the function get used in pipes later
+  # if it's the end of half, return the update. otherwise, return original df
   if (df %>% dplyr::slice(1) %>% pull(qtr) == 2 & df %>% dplyr::slice(1) %>% pull(half_seconds_remaining) == 0) {
     return(for_return)
   } else {
@@ -152,7 +158,6 @@ flip_half <- function(df) {
   }
   
 }
-
 
 # function to get WP for field goal attempt
 get_fg_wp <- function(df) {
@@ -168,6 +173,9 @@ get_fg_wp <- function(df) {
   # for 56 through 60 yards
   fg_prob <- if_else(df$yardline_100 >= 38 & df$yardline_100 <= 42, fg_prob * .9, fg_prob)
   
+  # note: if you're implementing this for your own team, provide your own estimates of your kicker's
+  # true probs
+  
   # win probability of kicking team if field goal is made
   fg_make_wp <- 
     1 - df %>%
@@ -179,7 +187,6 @@ get_fg_wp <- function(df) {
     ) %>%
     # for end of 1st half stuff
     flip_half() %>%
-    nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
     mutate(
       
@@ -206,12 +213,11 @@ get_fg_wp <- function(df) {
     ) %>%
     # for end of 1st half stuff
     flip_half() %>%
-    nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
     mutate(
       
       # fill in end of game situation when team can kneel out clock
-      # discourages punting when the other team can end the game
+      # discourages kicking when the other team can end the game after
       vegas_wp = case_when(
         score_differential > 0 & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 1,
         score_differential > 0 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 1,
@@ -222,11 +228,10 @@ get_fg_wp <- function(df) {
     ) %>%
     pull(vegas_wp)
   
-  # for end of half situations
-  # when team gets ball again after halftime
+  # for end of half situations when team gets ball again after halftime
+  # need to flip back WP again
   if (df %>% flip_team() %>% pull(half_seconds_remaining) == 0 & df$qtr == 2 &
     df %>% flip_team() %>% flip_half() %>% pull(posteam) == df$posteam) {
-    # message("test")
     fg_make_wp <- 1 - fg_make_wp
     fg_miss_wp <- 1 - fg_miss_wp
   }
@@ -244,6 +249,7 @@ get_fg_wp <- function(df) {
 get_punt_wp <- function(df, punt_df) {
   
   # special case for end of half: just assume half ends on punt
+  # and move game to start of 3rd Q
   if (df$qtr == 2 & df$half_seconds_remaining <= 6) {
     
     prob <- 1 - df %>%
@@ -252,13 +258,14 @@ get_punt_wp <- function(df, punt_df) {
       nflfastR::calculate_win_probability() %>%
       pull(vegas_wp)
     
-    # in case same team gets ball again
+    # in case same team gets ball again, need to flip WP back
     if (df %>% flip_team() %>% flip_half() %>% pull(posteam) == df$posteam) {
       prob <- 1 - prob
     }
     
     return(prob)
     
+  # now the normal case for typical non-end-of-half punt
   } else {
     
     # get the distribution at a yard line from punt data
@@ -314,10 +321,9 @@ get_punt_wp <- function(df, punt_df) {
       
       # have to flip bc other team
       1 - probs %>%
-        nflfastR::calculate_expected_points() %>%
         nflfastR::calculate_win_probability() %>%
         mutate(
-          # for the punt return TD case
+          # for the punt return TD or muff case: punting team will have ball again, so flip WP
           vegas_wp = if_else((yardline_after == 100 | muff == 1), 1 - vegas_wp, vegas_wp),
           
           # fill in end of game situation when team can kneel out clock
@@ -335,7 +341,7 @@ get_punt_wp <- function(df, punt_df) {
         pull(wp) %>%
         return()
     } else {
-      # message("Too close for punting")
+      # too close for punting
       return(NA_real_)
     }
     
@@ -353,18 +359,18 @@ get_go_wp <- function(df) {
       retractable,  dome,    posteam_spread, total_line,  posteam_total 
     )
   
+  # if a td is scored, get go for 1 and go for 2 WP
   td_probs <- get_2pt_wp(
     df %>% mutate(
+      # situation: team scored 6 points and 6 fewer seconds remain
       score_differential = score_differential + 6,
-      half_seconds_remaining = half_seconds_remaining - 6,
-      game_seconds_remaining = game_seconds_remaining - 6,
-      half_seconds_remaining = if_else(half_seconds_remaining < 0, 0, half_seconds_remaining),
-      game_seconds_remaining = if_else(game_seconds_remaining < 0, 0, game_seconds_remaining)
+      half_seconds_remaining = max(half_seconds_remaining - 6, 0),
+      game_seconds_remaining = max(game_seconds_remaining - 6, 0)
     )
   )
   
-  td_2 <- td_probs$`WP 2pt`
-  td_1 <- td_probs$`WP kick`
+  # assume that team does smart thing (lol)
+  td_prob <- max(td_probs$`WP kick`, td_probs$`WP 2pt`)
   
   # get model output from situation
   preds <- stats::predict(
@@ -393,12 +399,14 @@ get_go_wp <- function(df) {
       defeam_timeouts_pre = defteam_timeouts_remaining,
       turnover = dplyr::if_else(gain < ydstogo, as.integer(1), as.integer(0)),
       down = 1,
-      # possession change if 4th down failed or touchodwn
-      # flip yardline_100, timeouts, and score for turnovers
+      
+      # # special case for turnover where other team gets ball
+      # # note: touchdowns are dealt with separately in the 2pt function to start this function
+      
+      # flip yardline_100 for turnovers
       yardline_100 = dplyr::if_else(turnover == 1, as.integer(100 - yardline_100), as.integer(yardline_100)),
       
-      # if now goal to go, use yardline for yards to go, otherwise it's 1st and 10 either way
-      ydstogo = dplyr::if_else(yardline_100 < 10, as.integer(yardline_100), as.integer(10)),
+      # turnover: flip timeouts since other team gets ball
       posteam_timeouts_remaining = dplyr::if_else(turnover == 1 | yardline_100 == 0,
                                                   defeam_timeouts_pre,
                                                   posteam_timeouts_pre),
@@ -406,43 +414,42 @@ get_go_wp <- function(df) {
                                                   posteam_timeouts_pre,
                                                   defeam_timeouts_pre),
       
-      # swap score diff if turnover on downs. we deal with touchdown score diff below
+      # swap score diff if turnover on downs
       score_differential = if_else(turnover == 1, -score_differential, score_differential),
       
       # run off 6 seconds
       half_seconds_remaining = half_seconds_remaining - 6,
       game_seconds_remaining = game_seconds_remaining - 6,
-      half_seconds_remaining = if_else(half_seconds_remaining < 0, 0, half_seconds_remaining),
-      game_seconds_remaining = if_else(game_seconds_remaining < 0, 0, game_seconds_remaining),
-      
+
       # additional runoff after successful non-td conversion (entered from user input)
       half_seconds_remaining = if_else(turnover == 0 & df$yardline_100 > gain, half_seconds_remaining - df$runoff, half_seconds_remaining),
       game_seconds_remaining = if_else(turnover == 0 & df$yardline_100 > gain, game_seconds_remaining - df$runoff, game_seconds_remaining),
       
-      # flip receive_2h_ko var if turnover or touchdown
+      # after all that, make sure these aren't negative
+      half_seconds_remaining = max(half_seconds_remaining, 0),
+      game_seconds_remaining = max(game_seconds_remaining, 0),
+      
+      # flip receive_2h_ko var if turnover
       receive_2h_ko = case_when(
         qtr <= 2 & receive_2h_ko == 0 & (yardline_100 == 0 | turnover == 1) ~ 1,
         qtr <= 2 & receive_2h_ko == 1 & (yardline_100 == 0 | turnover == 1) ~ 0,
         TRUE ~ receive_2h_ko
       ),
-      # switch posteam if turnover or touchdown
+      
+      # switch posteam if turnover
       posteam = case_when(
-        home_team == posteam & (turnover == 1 | yardline_100 == 0) ~ away_team, 
-        away_team == posteam & (turnover == 1 | yardline_100 == 0) ~ home_team,
+        home_team == posteam & turnover == 1 ~ away_team, 
+        away_team == posteam & turnover == 1 ~ home_team,
         TRUE ~ posteam
       ),
       
-      original_yardline = yardline_100,
-      # deal with touchdown: swap score diff and take off 7 points
-      score_differential = if_else(yardline_100 == 0, as.integer(-score_differential - 7), as.integer(score_differential)),
-      # assume touchback after kick
-      yardline_100 = if_else(yardline_100 == 0, as.integer(75), as.integer(yardline_100))
+      # if now goal to go, use yardline for yards to go, otherwise it's 1st and 10 either way
+      ydstogo = dplyr::if_else(yardline_100 < 10, as.integer(yardline_100), as.integer(10))
+      
     ) %>%
-    flip_half() %>%
-    nflfastR::calculate_expected_points() %>%
     nflfastR::calculate_win_probability() %>%
     mutate(
-      # flip for possession change (turnover or td)
+      # flip WP for possession change (turnover)
       vegas_wp = if_else(posteam != df$posteam, 1 - vegas_wp, vegas_wp),
       # fill in end of game situation when team can kneel out clock after successful conversion
       vegas_wp = case_when(
@@ -451,15 +458,16 @@ get_go_wp <- function(df) {
         score_differential > 0 & turnover == 0 & df$yardline_100 > gain & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 1,
         TRUE ~ vegas_wp
       ),
-      # fill in end of game situation when team can kneel out clock after failed attempt
+      # fill in end of game situation when other team can kneel out clock after failed attempt
       vegas_wp = case_when(
         score_differential > 0 & turnover == 1 & game_seconds_remaining < 120 & defteam_timeouts_remaining == 0 ~ 0,
         score_differential > 0 & turnover == 1 & game_seconds_remaining < 80 & defteam_timeouts_remaining == 1 ~ 0,
         score_differential > 0 & turnover == 1 & game_seconds_remaining < 40 & defteam_timeouts_remaining == 2 ~ 0,
         TRUE ~ vegas_wp
       ),
-      # if a team is down by 8 with less than 10 minutes left and they score a TD, make them go for 2
-      vegas_wp = if_else(game_seconds_remaining < 600 & original_yardline == 0 & df$score_differential == -8, td_2, vegas_wp)
+      
+      # if a team scores a touchdown, give them the td_prob generated above
+      vegas_wp = if_else(yardline_100 == 0, td_prob, vegas_wp)
     ) %>%
     mutate(wt_wp = prob * vegas_wp) 
   
@@ -627,14 +635,10 @@ make_table <- function(df, current_situation) {
 }
   
 
-
-
-
-
-# function to get WP for field goal attempt
+# function to get WPs PAT decisions
 get_2pt_wp <- function(df) {
   
-  # stuff in the model
+  # stuff in the 2pt model
   data <- df %>%
     mutate(era2 = 0) %>%
     select(
@@ -642,7 +646,7 @@ get_2pt_wp <- function(df) {
       retractable,  dome,    posteam_spread, total_line,  posteam_total 
     )
   
-  # get model output from situation
+  # get probability of converting 2pt attempt from model
   make_prob <- stats::predict(
     two_pt_model,
     as.matrix(data)
@@ -651,6 +655,7 @@ get_2pt_wp <- function(df) {
     dplyr::rename(prob = "value") %>%
     dplyr::pull(prob)
   
+  # probability of making PAT
   xp_prob <- as.numeric(mgcv::predict.bam(fg_model, newdata = df %>% mutate(yardline_100 = 15), type="response"))
   
   wps <- 1 - tibble::tibble(
@@ -671,10 +676,14 @@ get_2pt_wp <- function(df) {
     posteam = if_else(df$home_team == df$posteam, df$away_team, df$home_team),
     season = df$season,
     home_team = df$home_team,
+    away_team = df$away_team,
     roof = df$roof,
-    spread_line = df$spread_line
+    spread_line = df$spread_line,
+    home_opening_kickoff = df$home_opening_kickoff,
+    qtr = df$qtr,
   ) %>%
-    nflfastR::calculate_expected_points() %>%
+    # for end of half situation
+    flip_half() %>%
     nflfastR::calculate_win_probability() %>%
     pull(vegas_wp)
   
