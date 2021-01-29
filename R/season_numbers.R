@@ -229,16 +229,14 @@ ggsave("figures/league_behavior.png")
 
 # ###########
 # go by WP
+
+min <- 2
+max <- 4
+
 my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>")
-plot <- cleaned %>%
-  filter(go_boost > 2) %>%
-  mutate(wp = round(100 * prior_wp, 0)) %>%
-  group_by(wp) %>%
-  summarize(go = 100 * mean(go), n = n()) %>%
-  ungroup()
 
 cleaned %>%
-  filter(go_boost > 2) %>%
+  filter(go_boost > min & go_boost < max) %>%
   mutate(prior_wp = 100 * prior_wp) %>%
   ggplot(aes(prior_wp, go)) + 
   # geom_point(size = 5, color = "black", alpha = .5) +
@@ -246,8 +244,8 @@ cleaned %>%
   theme_bw()+
   labs(x = "Win probability prior to play",
        y = "Go-for-it percentage",
-       caption = paste0("Figure: @benbbaldwin"),
-       subtitle = "@ben_bot_baldwin gain in win prob by going for it > 2 percentage points",
+       caption = paste0("Figure: @benbbaldwin | 2020 season"),
+       subtitle = glue::glue("@ben_bot_baldwin gain in win prob by going {min}-{max} percentage points"),
        title = my_title) +
   theme(
     legend.position = "none",
@@ -373,7 +371,7 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   theme_bw() +
   theme(
     panel.grid.major.x = element_blank(),
-    plot.title = element_markdown(size=22,face = 2,hjust=.5),
+    plot.title = element_markdown(size=20,face = 2,hjust=.5),
     plot.subtitle = element_text(size=8, hjust=.5),
     axis.title.x=element_blank(),
     axis.text.x=element_blank(),

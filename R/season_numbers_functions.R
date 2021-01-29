@@ -52,7 +52,9 @@ prepare_data <- function(pbp) {
     dplyr::group_by(game_id) %>%
     dplyr::mutate(
       # needed for WP model
-      receive_2h_ko = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0)
+      receive_2h_ko = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0),
+      # because games df looks for "yr" and not "season"
+      yr = season
     ) %>%
     ungroup() %>%
     filter(down == 4, game_seconds_remaining > 30, 
