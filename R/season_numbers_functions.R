@@ -10,6 +10,7 @@ get_probs <- function(p, games) {
     "qtr" = p$qtr,
     "time" = p$quarter_seconds_remaining,
     'posteam' = p$posteam,
+    'defteam' = p$defteam,
     'away_team' = p$away_team,
     'home_team' = p$home_team,
     'yardline_100' = p$yardline_100,
@@ -93,7 +94,7 @@ clean_data <- function(fourth_downs) {
       should_go = if_else(go_boost > 0, 1, 0)
     ) %>%
     select(
-      game_id, play_id, season, week, prior_wp, url, posteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
+      game_id, play_id, season, week, score_differential, prior_wp, url, posteam, defteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
     ) %>%
     return()
 }

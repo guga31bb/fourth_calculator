@@ -16,7 +16,7 @@ source('R/season_numbers_functions.R')
 # new addition 18 dec 2020: current season function which saves calculations that have been done already
 # so if you run this one week and again the next week, it will only have to do calculations for the new games
 # do not use this function with older seasons, use get_season as shown below
-# or just load the data i already provide in this repo
+# or just load the data provided in this repo
 cleaned <- get_current_season(2020)
 
 # **************************************************************************************
@@ -75,7 +75,7 @@ t <- cleaned %>%
     align = "center"
   ) %>% 
   tab_header(
-    title = md(glue::glue("NFL team decision-making by go recommendation, 2020"))
+    title = md(glue::glue("NFL team decision-making by go recommendation, {s}"))
   ) %>%
   tab_source_note(md('**Notes**: "Definitely" recommendations are greater than 4 percentage point advantage,<br> "probably" 1-4 percentage points'))
 
@@ -89,24 +89,30 @@ t %>% gtsave("figures/team_behavior.png")
 
 t <- cleaned %>%
   filter(
-    play_type != "PENALTY",
-    go == 0
+    week > 17,
+    # play_type != "PENALTY",
+    go == 0,
+    # they tried to go for it
+    !(posteam == "ARI" & week == 3 & play_id == 2364)
   ) %>%
   mutate(
     defteam = if_else(posteam == home_team, away_team, home_team)
   ) %>%
   arrange(-go_boost) %>%
-  head(5) %>%
-  select(posteam, defteam, week, qtr, ydstogo, go_boost, desc) %>%
+  mutate(rank = 1 : n()) %>%
+  head(10) %>%
+  select(rank, posteam, defteam, week, qtr, ydstogo, diff = score_differential, go_boost, desc) %>%
   gt() %>%
   cols_label(
+    rank = "",
     posteam = "Team",
-    defteam = "Opp.",
+    defteam = "Opp",
     week = "Week",
     qtr = "Qtr",
-    ydstogo = "Yds to go",
+    ydstogo = "YTG",
+    diff = "Diff",
     desc = "Play",
-    go_boost = "Go gain (%)"
+    go_boost = "WP loss"
   ) %>%
   tab_style(
     style = cell_text(color = "black", weight = "bold"),
@@ -114,6 +120,27 @@ t <- cleaned %>%
       cells_row_groups(),
       cells_column_labels(everything())
     )
+  ) %>% 
+  text_transform(
+    locations = cells_body(vars(posteam)),
+    fn = function(x) web_image(url = paste0('https://a.espncdn.com/i/teamlogos/nfl/500/',x,'.png'))
+  ) %>% 
+  text_transform(
+    locations = cells_body(vars(defteam)),
+    fn = function(x) web_image(url = paste0('https://a.espncdn.com/i/teamlogos/nfl/500/',x,'.png'))
+  ) %>% 
+  cols_width(
+    everything() ~ px(400),
+    ) %>% 
+  cols_width(
+    vars(rank) ~ px(30),
+    vars(posteam) ~ px(50),
+    vars(defteam) ~ px(50),
+    vars(week) ~ px(50),
+    vars(diff) ~ px(50),
+    vars(qtr) ~ px(50),
+    vars(ydstogo) ~ px(50),
+    vars(go_boost) ~ px(70)
   ) %>% 
   tab_options(
     row_group.border.top.width = px(3),
@@ -125,18 +152,20 @@ t <- cleaned %>%
     table.border.bottom.color = "white",
     table.border.bottom.width = px(1),
     column_labels.border.bottom.color = "black",
-    column_labels.border.bottom.width = px(2)
-    
+    column_labels.border.bottom.width = px(2),
+    row.striping.background_color = '#FFFFFF',
+    row.striping.include_table_body = TRUE,
+    table.background.color = '#F2F2F2'
   ) %>%
   fmt_number(
     columns = vars(go_boost), decimals = 1
   ) %>%
   cols_align(
-    columns = 1:5,
+    columns = 1:8,
     align = "center"
   ) %>% 
   tab_header(
-    title = md(glue::glue("Worst kick decisions of 2020"))
+    title = md(glue::glue("Worst kick decisions of {s} playoffs"))
   )
 
 t
@@ -158,11 +187,10 @@ cleaned %>%
 
 
 # **************************************************************************************
-# league behavior by co recommendation
+# league behavior by go recommendation
 
 my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>")
 plot <- cleaned %>%
-  # filter(prior_wp > .05 & prior_wp < .95) %>%
   mutate(go_boost = RoundTo(go_boost, 0.5)) %>%
   group_by(go_boost) %>%
   summarize(go = 100 * mean(go)) %>%
@@ -236,6 +264,7 @@ ggsave("figures/league_behavior_wp.png")
 current <- cleaned %>%
   filter(go_boost > 1.5) %>%
   filter(prior_wp > .2) %>%
+  filter(week <= 17) %>%
   group_by(posteam) %>%
   summarize(go = mean(go), n = n()) %>%
   ungroup() %>%
@@ -293,26 +322,46 @@ ggsave(glue::glue("figures/teams_{s}.png"))
 
 # total WP lost
 current <- cleaned %>%
+  # FOR PLAYOFFS ONLY
+  # filter(week > 17) %>%
+  # FOR PLAYOFFS ONLY
+  group_by(posteam) %>%
+  mutate(
+    games = n_distinct(game_id),
+  ) %>%
+  ungroup() %>%
   filter(go_boost > 0, go == 0) %>%
   group_by(posteam) %>%
-  summarize(go = sum(go_boost), n = n()) %>%
+  summarize(
+    go = sum(go_boost), 
+    n = n(),
+    games = dplyr::first(games),
+    go = go/games
+    ) %>%
   ungroup() %>%
   left_join(nflfastR::teams_colors_logos, by=c('posteam' = 'team_abbr')) %>%
   arrange(-go) %>%
   mutate(rank = 1:n()) %>%
   arrange(posteam)
 
+
+ids <- nflfastR::teams_colors_logos %>%
+  filter(!team_abbr %in% c('LAR', 'OAK', 'SD', 'STL')) %>%
+  filter(team_abbr %in% current$posteam)
+images <- magick::image_read(ids%>% pull(team_logo_espn)) 
+
+
 logos <- tibble(
   x = current$rank + .25, 
   y = current$go + .02,
   width = .035,
   grob = 
-    map(1:32, function(x) {
+    map(1:length(images), function(x) {
       grid::rasterGrob(images[x])
     })
 )
 
-my_title <- glue::glue("Expected win probability <span style='color:red'>lost by kicking in go situations</span>, {s}")
+my_title <- glue::glue("Expected win probability per game <span style='color:red'>lost by kicking in go situations</span>, {s}")
 ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   geom_col(data = current, aes(fill = ifelse(posteam=="SEA", team_color2, team_color)), 
            width = 0.5, alpha = .6, show.legend = FALSE
@@ -334,7 +383,7 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   scale_y_continuous(n.breaks = 10) +
   labs(
     x = "",
-    y = "Win probability lost",
+    y = "Win probability lost per game",
     title= my_title,
     caption = glue::glue("@benbbaldwin | Excl. final 30 seconds of game")
   )
@@ -343,7 +392,11 @@ ggsave(glue::glue("figures/teams_lost_{s}.png"))
 
 
 
-# **************************************************************************************
+# ***********************************************************************************************************************
+# ***********************************************************************************************************************
+# ***********************************************************************************************************************
+# ***********************************************************************************************************************
+
 # the second part: numbers for every season
 
 # get old season numbers if they aren't there already
@@ -434,6 +487,162 @@ make_timeline <- function(team) {
   
 }
 
-make_timeline("NO")
+make_timeline("BAL")
+
+
+y = 2018
+# total WP lost
+current <- cleaned_all %>%
+  mutate(
+    season = substr(game_id, 1, 4) %>% as.numeric()
+  ) %>%
+  filter(go_boost > 0, go == 0, season == y) %>%
+  group_by(posteam) %>%
+  summarize(go = sum(go_boost), n = n()) %>%
+  ungroup() %>%
+  left_join(nflfastR::teams_colors_logos, by=c('posteam' = 'team_abbr')) %>%
+  arrange(-go) %>%
+  mutate(rank = 1:n()) %>%
+  arrange(posteam)
+
+logos <- tibble(
+  x = current$rank + .25, 
+  y = current$go + .02,
+  width = .035,
+  grob = 
+    map(1:32, function(x) {
+      grid::rasterGrob(images[x])
+    })
+)
+
+my_title <- glue::glue("Expected win probability <span style='color:red'>lost by kicking in go situations</span>, {y}")
+ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
+  geom_col(data = current, aes(fill = ifelse(posteam=="SEA", team_color2, team_color)), 
+           width = 0.5, alpha = .6, show.legend = FALSE
+  ) +
+  geom_grob(data = logos, 
+            aes(x, y, label = grob, vp.width = width),
+            hjust = 0.7) +
+  scale_fill_identity(aesthetics = c("fill", "colour")) +
+  theme_bw() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_markdown(size=22,face = 2,hjust=.5),
+    plot.subtitle = element_text(size=8, hjust=.5),
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank()
+  ) +
+  # scale_y_continuous(expand=c(0,0), limits=c(0, max(current$go + 5))) +
+  scale_y_continuous(n.breaks = 10) +
+  labs(
+    x = "",
+    y = "Win probability lost",
+    title= my_title,
+    caption = glue::glue("@benbbaldwin | Excl. final 30 seconds of game")
+  )
+
+ggsave(glue::glue("figures/teams_lost_{y}.png"))
+
+
+
+
+
+
+# ********************************************************************
+# total WP lost
+current <- cleaned_all %>%
+  mutate(
+    season = substr(game_id, 1, 4) %>% as.integer(),
+    week = substr(game_id, 6, 7) %>% as.integer(),
+    defteam = if_else(posteam == home_team, away_team, home_team)
+  ) %>%
+  filter(go_boost > 0, go == 0, week > 17) %>%
+  group_by(game_id, posteam, defteam) %>%
+  summarize(
+    go = sum(go_boost), 
+    n = n(),
+    season = dplyr::first(season),
+    week = dplyr::first(week)
+    ) %>%
+  ungroup() %>%
+  left_join(nflfastR::teams_colors_logos, by=c('posteam' = 'team_abbr')) %>%
+  arrange(-go) %>%
+  mutate(rank = 1:n()) %>%
+  arrange(rank) %>%
+  head(15) %>%
+  select(rank, posteam, defteam, season, week, go) %>%
+  mutate(week = case_when(
+    week == 18 ~ "WC",
+    week == 19 ~ "DIV",
+    week == 20 ~ "CONF",
+    week == 21 ~ "SB"
+  ))
+
+t <- current %>%
+  gt() %>%
+    cols_label(
+      rank = " ",
+      posteam = "Team",
+      defteam = "Opp",
+      week = "Week",
+      season = "Season",
+      go = "WP Lost"
+    ) %>%
+    tab_style(
+      style = cell_text(color = "black", weight = "bold"),
+      locations = list(
+        cells_row_groups(),
+        cells_column_labels(everything())
+      )
+    ) %>% 
+    text_transform(
+      locations = cells_body(vars(posteam)),
+      fn = function(x) web_image(url = paste0('https://a.espncdn.com/i/teamlogos/nfl/500/',x,'.png'))
+    ) %>% 
+    text_transform(
+      locations = cells_body(vars(defteam)),
+      fn = function(x) web_image(url = paste0('https://a.espncdn.com/i/teamlogos/nfl/500/',x,'.png'))
+    ) %>% 
+    cols_width(
+      everything() ~ px(400),
+    ) %>% 
+    cols_width(
+      vars(posteam) ~ px(50),
+      vars(defteam) ~ px(50),
+      vars(week) ~ px(50),
+      vars(rank) ~ px(50),
+      vars(season) ~ px(70),
+      vars(go) ~ px(80)
+    ) %>% 
+    tab_options(
+      row_group.border.top.width = px(3),
+      row_group.border.top.color = "black",
+      row_group.border.bottom.color = "black",
+      table_body.hlines.color = "white",
+      table.border.top.color = "black",
+      table.border.top.width = px(1),
+      table.border.bottom.color = "white",
+      table.border.bottom.width = px(1),
+      column_labels.border.bottom.color = "black",
+      column_labels.border.bottom.width = px(2),
+      row.striping.background_color = '#FFFFFF',
+      row.striping.include_table_body = TRUE,
+      table.background.color = '#F2F2F2'
+    ) %>%
+    fmt_number(
+      columns = vars(go), decimals = 1
+    ) %>%
+    cols_align(
+      columns = 1:6,
+      align = "center"
+    ) %>% 
+    tab_header(
+      title = md(glue::glue("Win probability lost by kicking in playoff games, 2014-2020"))
+    )
+
+t
+
+t %>% gtsave("figures/team_worst_playoffs.png")
 
 
