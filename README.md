@@ -85,6 +85,7 @@ Typing in all the situation variables is a pain. Here's how to get the table fro
 ``` r
 # helper function that prepares data and most importantly creates indicator for 2nd half kickoff team
 source("R/season_numbers_functions.R")
+source('R/helpers.R')
 
 # get the play (I cheated and already looked up play ID)
 pbp <- readRDS(url("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2020.rds")) %>%
