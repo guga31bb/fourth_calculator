@@ -23,3 +23,57 @@ There are some edge cases that are not accounted for. These should only make a m
 * The **go for it** model does not allow for the possibility of a turnover return. However, long returns are extremely rare: For example, in 2018 and 2019 there were only four defensive touchdowns on plays where teams went for fourth downs out of 1,236 plays, and all of these happened when the game was well in hand for the other team.
 * The **punt** model doesn’t account for the punter or returner, ignores penalties on returns and ignores the potential for blocked punts to be returned for touchdowns
 * The **field goal** model doesn’t account for who the kicker is, what the weather is (only relevant for outdoor games), or the possibility of a kick being blocked and returned for a touchdown
+
+## Example usage
+
+Here is the code that can look up one play. This is the controversial field goal attempt that the Packers attempted at the end of the 2020 NFC Championship Game.
+
+``` r
+source('R/helpers.R')
+
+# get the situation from user input
+df <- 
+    tibble::tibble(
+      
+      # reg or post
+      "type" = "post",
+      
+      "qtr" = 4,
+      
+      # since user input is mins and seconds
+      "time" = 60 * as.integer(2) + as.integer(9),
+      
+      'posteam' = as.character("GB"),
+      'away_team' = as.character("TB"),
+      'home_team' = as.character("GB"),
+      'yardline_100' = as.integer(8),
+      'ydstogo' = as.integer(8),
+      'posteam_timeouts_remaining' = as.integer(3),
+      'defteam_timeouts_remaining' = as.integer(3),
+      
+      # did home team receive opening kickoff?
+      'home_opening_kickoff' = as.integer(0),
+      
+      'score_differential' = as.integer(-8),
+      
+      # user input for additional runoff in seconds after successful 4th down conversion
+      'runoff' = as.integer(0),
+      
+      # season that the game happened in
+      'yr' = as.integer(2020)
+    ) %>%
+      # helper function to look up point spread and roof type for given game
+      prepare_df(games)
+
+# main function in R/helpers.R
+# punt_df is automatically loaded by the source line above and contains the distribution of punts
+
+make_table_data(df, punt_df)
+
+# A tibble: 3 x 5
+  choice             choice_prob success_prob fail_wp success_wp
+  <chr>                    <dbl>        <dbl>   <dbl>      <dbl>
+1 Go for it                12.7          32.7    3.53      31.5 
+2 Field goal attempt        8.90         97.5    2.99       9.05
+3 Punt                     NA            NA     NA         NA 
+```
