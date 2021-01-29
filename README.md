@@ -24,7 +24,7 @@ There are some edge cases that are not accounted for. These should only make a m
 * The **punt** model doesn’t account for the punter or returner, ignores penalties on returns and ignores the potential for blocked punts to be returned for touchdowns
 * The **field goal** model doesn’t account for who the kicker is, what the weather is (only relevant for outdoor games), or the possibility of a kick being blocked and returned for a touchdown
 
-## Example usage
+## Example usage 1: user input
 
 Here is the code that can look up one play. This is the controversial field goal attempt that the Packers attempted at the end of the 2020 NFC Championship Game.
 
@@ -76,4 +76,27 @@ make_table_data(df, punt_df)
 1 Go for it                12.7          32.7    3.53      31.5 
 2 Field goal attempt        8.90         97.5    2.99       9.05
 3 Punt                     NA            NA     NA         NA 
+```
+
+## Example usage 2 : from an nflfastR play
+
+Typing in all the situation variables is a pain. Here's how to get the table from a play that already exists in nflfastR data:
+
+``` r
+# helper function that prepares data and most importantly creates indicator for 2nd half kickoff team
+source("R/season_numbers_functions.R")
+
+# get the play (I cheated and already looked up play ID)
+pbp <- readRDS(url("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2020.rds")) %>%
+  prepare_data() %>%
+  filter(week == 20, posteam == "GB", play_id == 3728)
+
+make_table_data(df, punt_df)
+
+# A tibble: 3 x 5
+  choice             choice_prob success_prob fail_wp success_wp
+  <chr>                    <dbl>        <dbl>   <dbl>      <dbl>
+1 Go for it                12.7          32.7    3.53      31.5 
+2 Field goal attempt        8.90         97.5    2.99       9.05
+3 Punt                     NA            NA     NA         NA   
 ```
