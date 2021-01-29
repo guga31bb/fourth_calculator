@@ -146,7 +146,8 @@ flip_half <- function(df) {
       game_seconds_remaining = 1800,
       score_differential = if_else(
         posteam == df$posteam, score_differential, -score_differential
-      )
+      ),
+      receive_2h_ko = 0
     )
   
   # this helps the function get used in pipes later
@@ -395,6 +396,8 @@ get_go_wp <- function(df) {
     # update situation based on play result
     mutate(
       yardline_100 = yardline_100 - gain,
+      # for figuring out if it was a td later
+      final_yardline = yardline_100,
       posteam_timeouts_pre = posteam_timeouts_remaining,
       defeam_timeouts_pre = defteam_timeouts_remaining,
       turnover = dplyr::if_else(gain < ydstogo, as.integer(1), as.integer(0)),
@@ -447,6 +450,7 @@ get_go_wp <- function(df) {
       ydstogo = dplyr::if_else(yardline_100 < 10, as.integer(yardline_100), as.integer(10))
       
     ) %>%
+    flip_half() %>%
     nflfastR::calculate_win_probability() %>%
     mutate(
       # flip WP for possession change (turnover)
@@ -467,7 +471,7 @@ get_go_wp <- function(df) {
       ),
       
       # if a team scores a touchdown, give them the td_prob generated above
-      vegas_wp = if_else(yardline_100 == 0, td_prob, vegas_wp)
+      vegas_wp = if_else(final_yardline == 0, td_prob, vegas_wp)
     ) %>%
     mutate(wt_wp = prob * vegas_wp) 
   
@@ -685,6 +689,8 @@ get_2pt_wp <- function(df) {
     # for end of half situation
     flip_half() %>%
     nflfastR::calculate_win_probability() %>%
+    # for other side of half
+    mutate(vegas_wp = if_else(posteam == df$posteam, 1 - vegas_wp, vegas_wp)) %>%
     pull(vegas_wp)
   
   # xp wp
