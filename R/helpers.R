@@ -371,7 +371,7 @@ get_go_wp <- function(df) {
   )
   
   # assume that team does smart thing (lol)
-  td_prob <- max(td_probs$`WP kick`, td_probs$`WP 2pt`)
+  td_wp <- max(td_probs$`WP kick`, td_probs$`WP 2pt`)
   
   # get model output from situation
   preds <- stats::predict(
@@ -471,7 +471,7 @@ get_go_wp <- function(df) {
       ),
       
       # if a team scores a touchdown, give them the td_prob generated above
-      vegas_wp = if_else(final_yardline == 0, td_prob, vegas_wp)
+      vegas_wp = if_else(final_yardline == 0, td_wp, vegas_wp)
     ) %>%
     mutate(wt_wp = prob * vegas_wp) 
   
