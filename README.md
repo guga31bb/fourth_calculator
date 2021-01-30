@@ -92,8 +92,8 @@ pbp <- readRDS(url("https://raw.githubusercontent.com/guga31bb/nflfastR-data/mas
   prepare_data() %>%
   filter(week == 20, posteam == "GB", play_id == 3728) %>%
   prepare_df(games) %>%
-  # this is a bug where not doing this causes weird behavior. idk
-  select(names(df))
+  # this is an nflfastR bug where existing wp messes with the 4th down functions
+  select(-vegas_wp)
 
 make_table_data(pbp, punt_df)
 
