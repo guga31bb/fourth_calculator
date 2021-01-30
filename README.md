@@ -90,9 +90,12 @@ source('R/helpers.R')
 # get the play (I cheated and already looked up play ID)
 pbp <- readRDS(url("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_2020.rds")) %>%
   prepare_data() %>%
-  filter(week == 20, posteam == "GB", play_id == 3728)
+  filter(week == 20, posteam == "GB", play_id == 3728) %>%
+  prepare_df(games) %>%
+  # this is a bug where not doing this causes weird behavior. idk
+  select(names(df))
 
-make_table_data(df, punt_df)
+make_table_data(pbp, punt_df)
 
 # A tibble: 3 x 5
   choice             choice_prob success_prob fail_wp success_wp
@@ -100,4 +103,11 @@ make_table_data(df, punt_df)
 1 Go for it                12.7          32.7    3.53      31.5 
 2 Field goal attempt        8.90         97.5    2.99       9.05
 3 Punt                     NA            NA     NA         NA   
+```
+## Example usage 3 : make the table
+
+Here's how to get the actual table on the shiny app and tweeted out by the bot.
+```
+make_table(make_table_data(pbp, punt_df), pbp)
+ 
 ```
