@@ -10,6 +10,8 @@ This is the repository for the [fourth down calculator](https://rbsdm.com/stats/
 
 The code that powers the Twitter fourth down bot [is in this folder here](https://github.com/guga31bb/fourth_calculator/tree/main/bot).
 
+To get starting using the code, I would recommend **cloning this repository** (which gets the dataframes with 4th down calculations already applied) and then going through [my file analyzing the  data](https://github.com/guga31bb/fourth_calculator/blob/main/R/season_numbers.R).
+
 ## Features
 
 * The **go for it** model gives probabilities for possibilities of yards gained and includes the possibility of earning a first down via defensive penalty
