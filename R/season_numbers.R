@@ -419,9 +419,6 @@ cleaned_all <- bind_rows(
 
 # team over time
 current <- cleaned_all %>%
-  mutate(
-    season = substr(game_id, 1, 4) %>% as.numeric()
-  ) %>%
   filter(go_boost > 1.5) %>%
   filter(prior_wp > .2) %>%
   group_by(posteam, season) %>%
@@ -485,7 +482,7 @@ make_timeline <- function(team) {
   
 }
 
-make_timeline("BAL")
+make_timeline("PHI")
 
 
 y = 2018
@@ -548,13 +545,8 @@ ggsave(glue::glue("figures/teams_lost_{y}.png"))
 
 
 # ********************************************************************
-# total WP lost
+# total WP lost in playoff games
 current <- cleaned_all %>%
-  mutate(
-    season = substr(game_id, 1, 4) %>% as.integer(),
-    week = substr(game_id, 6, 7) %>% as.integer(),
-    defteam = if_else(posteam == home_team, away_team, home_team)
-  ) %>%
   filter(go_boost > 0, go == 0, week > 17) %>%
   group_by(game_id, posteam, defteam) %>%
   summarize(
@@ -568,7 +560,7 @@ current <- cleaned_all %>%
   arrange(-go) %>%
   mutate(rank = 1:n()) %>%
   arrange(rank) %>%
-  head(15) %>%
+  head(20) %>%
   select(rank, posteam, defteam, season, week, go) %>%
   mutate(week = case_when(
     week == 18 ~ "WC",
@@ -577,7 +569,12 @@ current <- cleaned_all %>%
     week == 21 ~ "SB"
   ))
 
-t <- current %>%
+d <- bind_cols(
+  current %>% dplyr::slice(1:10),
+  current %>% dplyr::slice(11:20)
+)
+
+t <- d %>%
   gt() %>%
     cols_label(
       rank = " ",
@@ -585,7 +582,13 @@ t <- current %>%
       defteam = "Opp",
       week = "Week",
       season = "Season",
-      go = "WP Lost"
+      go = "WP Lost", 
+      rank1 = " ",
+      posteam1 = "Team",
+      defteam1= "Opp",
+      week1 = "Week",
+      season1 = "Season",
+      go1 = "WP Lost"
     ) %>%
     tab_style(
       style = cell_text(color = "black", weight = "bold"),
@@ -595,23 +598,19 @@ t <- current %>%
       )
     ) %>% 
     text_transform(
-      locations = cells_body(vars(posteam)),
-      fn = function(x) web_image(url = paste0('https://a.espncdn.com/i/teamlogos/nfl/500/',x,'.png'))
-    ) %>% 
-    text_transform(
-      locations = cells_body(vars(defteam)),
+      locations = cells_body(vars(posteam, posteam1, defteam, defteam1)),
       fn = function(x) web_image(url = paste0('https://a.espncdn.com/i/teamlogos/nfl/500/',x,'.png'))
     ) %>% 
     cols_width(
       everything() ~ px(400),
     ) %>% 
     cols_width(
-      vars(posteam) ~ px(50),
-      vars(defteam) ~ px(50),
-      vars(week) ~ px(50),
-      vars(rank) ~ px(50),
-      vars(season) ~ px(70),
-      vars(go) ~ px(80)
+      vars(posteam, posteam1) ~ px(50),
+      vars(defteam, defteam1) ~ px(50),
+      vars(week, week1) ~ px(50),
+      vars(rank, rank1) ~ px(50),
+      vars(season, season1) ~ px(70),
+      vars(go, go1) ~ px(80)
     ) %>% 
     tab_options(
       row_group.border.top.width = px(3),
@@ -629,18 +628,116 @@ t <- current %>%
       table.background.color = '#F2F2F2'
     ) %>%
     fmt_number(
-      columns = vars(go), decimals = 1
+      columns = vars(go, go1), decimals = 1
     ) %>%
     cols_align(
-      columns = 1:6,
+      columns = 1:12,
       align = "center"
     ) %>% 
     tab_header(
       title = md(glue::glue("Win probability lost by kicking in playoff games, 2014-2020"))
+    ) %>%
+    tab_style(
+      style = cell_borders(
+        sides = c("left"),
+        color = "#BBBBBB",
+        weight = px(1.5),
+        style = "solid"
+      ),
+      locations = cells_body(
+        columns = vars(rank1),
+        rows = everything()
+      )
     )
 
 t
 
 t %>% gtsave("figures/team_worst_playoffs.png")
+
+
+# ########### increasing aggressiveness over time
+
+# labels on the plot
+text_df <- tibble(
+  label = c(
+    "NFL coaches<br>in <span style='color:#00BFC4'>**2020**</span>",
+    "NFL coaches<br>in <span style='color:#F8766D'>**2014**</span>"
+  ),
+  x = c(6, 8.2),
+  y = c(80, 37),
+  angle = c(10, 10),
+  color = c("black", "black")
+)
+
+
+my_title <- glue::glue("How <span style='color:red'>math</span> is changing football")
+cleaned_all %>%
+  mutate(go = go * 100) %>%
+  filter(prior_wp > .2) %>%
+  filter(between(go_boost, -10, 10)) %>%
+  filter(season %in% c(2014, 2020)) %>%
+  ggplot(aes(go_boost, go, color = as.factor(season))) + 
+  geom_richtext(data = text_df,   
+                aes(
+                  x, y, label = label, angle = angle
+                ), color = "black", fill = NA, label.color = NA, size = 5
+  ) + 
+  
+  geom_vline(xintercept = 0)+
+  stat_smooth(method = "gam", method.args = list(gamma = 1), formula = y ~ s(x, bs = "cs", k = 10), show.legend = F, se = F, size = 4) +
+  # this is just to get the plot to draw the full 0 to 100 range
+  geom_hline(yintercept = 100, alpha = 0) +
+  geom_hline(yintercept = 0, alpha = 0) +
+  theme_fivethirtyeight()+
+  labs(x = "Gain in win probability by going for it",
+       y = "Go-for-it percentage",
+       subtitle = "4th down decisions in 2020 versus 2014",
+       caption = paste0("Figure: @benbbaldwin | WP gain from @ben_bot_baldwin\nWin prob. > 20%"),
+       title = my_title) +
+  theme(
+    legend.position = "none",
+    plot.title = element_markdown(size = 22, hjust = 0.5),
+    plot.subtitle = element_markdown(size = 12, hjust = 0.5),
+    axis.title.x = element_text(size=12, face="bold"),
+    axis.title.y = element_text(size=12, face="bold")
+    
+  ) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 4), expand = c(0,0)) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 10), limits = c(-10, 10), expand = c(0,0)) +
+  
+
+  annotate("text",x=-1.2, y= 70, label = "Should\nkick", color="black", size = 5) +
+  annotate("text",x=1.2, y= 70, label = "Should\ngo for it", color="black", size = 5) +
+  
+  # annotate("text",x=6, y= 80, 
+  #          label = "NFL coaches\nin 2020", 
+  #          color="black", size = 5) +
+  # annotate("text",x=8.5, y= 40, label = "NFL coaches\nin 2014", color="black", size = 5) +
+  # 
+  # coaches getting closer to models
+  # annotate("text",x=7.5, y= 20, label = "Coaches getting\ncloser to model", color="black", size = 4) +
+  
+  geom_segment(
+    aes(x = -.1, y = 80, xend = -2, yend = 80),
+    arrow = arrow(length = unit(0.05, "npc")),
+    color = "black",
+    size = 2
+    ) +
+  geom_segment(
+    aes(x = .1, y = 80, xend = 2, yend = 80),
+    arrow = arrow(length = unit(0.05, "npc")),
+    color = "black",
+    size = 2
+  )
+  # geom_segment(
+  #   aes(x = 6, y = 37, xend = 6, yend = 62),
+  #   arrow = arrow(length = unit(0.05, "npc")),
+  #   color = "black",
+  #   size = 1
+  # )
+
+  
+
+ggsave("figures/league_behavior_2014_2020.png")
 
 

@@ -599,8 +599,7 @@ make_table <- function(df, current_situation) {
     fmt_number(
       columns = vars(choice_prob, success_prob, success_wp, fail_wp), decimals = 0
     ) %>%
-    tab_source_note(md("**Please cite**: Ben Baldwin's fourth down model"
-    )) %>%
+    tab_source_note(md("**Source**: @ben_bot_baldwin")) %>%
     tab_style(
       style = list(
         cell_text(color = "red", weight = "bold")
@@ -623,17 +622,17 @@ make_table <- function(df, current_situation) {
       columns = 2:5,
       align = "center"
     ) %>% 
-    tab_footnote(
-      footnote = "Expected win % for a given decision",
-      locations = cells_column_labels(2)
-    ) %>% 
+    # tab_footnote(
+    #   footnote = "Expected win % for a given decision",
+    #   locations = cells_column_labels(2)
+    # ) %>% 
     tab_footnote(
       footnote = "Likelihood of converting on 4th down or of making field goal",
       locations = cells_column_labels(3)
     )  %>%
     tab_header(
       title = md(glue::glue("{case_when(current_situation$score_differential < 0 ~ 'Down', current_situation$score_differential == 0 ~ 'Tied', current_situation$score_differential > 0 ~ 'Up')} {ifelse(current_situation$score_differential == 0, 'up', abs(current_situation$score_differential))}, 4th & {current_situation$ydstogo}, {current_situation$yardline_100} yards from opponent end zone")),
-      subtitle = md(glue::glue("Qtr {current_situation$qtr}, {hms::hms(current_situation$time) %>% substr(4, 8)}"))
+      subtitle = md(glue::glue("Qtr {current_situation$qtr}, {hms::hms(current_situation$time) %>% substr(4, 8)} | Timeouts: Off {current_situation$posteam_timeouts_remaining}, Def {current_situation$defteam_timeouts_remaining}"))
     )
   
 }
@@ -787,8 +786,7 @@ make_table_2pt <- function(df, current_situation) {
     fmt_number(
       columns = vars(choice_prob, success_prob, success_wp, fail_wp), decimals = 0
     ) %>%
-    tab_source_note(md("**Please cite**: Ben Baldwin's 2-point down model"
-    )) %>%
+    tab_source_note(md("**Source**: @ben_bot_baldwin")) %>%
     tab_style(
       style = list(
         cell_text(color = "red", weight = "bold")
@@ -811,10 +809,10 @@ make_table_2pt <- function(df, current_situation) {
       columns = 2:5,
       align = "center"
     ) %>% 
-    tab_footnote(
-      footnote = "Expected win % for a given decision",
-      locations = cells_column_labels(2)
-    ) %>% 
+    # tab_footnote(
+    #   footnote = "Expected win % for a given decision",
+    #   locations = cells_column_labels(2)
+    # ) %>% 
     tab_footnote(
       footnote = "Likelihood of converting 2 point attempt or PAT",
       locations = cells_column_labels(3)

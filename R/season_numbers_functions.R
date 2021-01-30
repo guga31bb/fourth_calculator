@@ -52,14 +52,22 @@ prepare_data <- function(pbp) {
     dplyr::group_by(game_id) %>%
     dplyr::mutate(
       # needed for WP model
+      # this is actually used as "home opening kickoff" but named badly
       receive_2h_ko = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0),
       # because games df looks for "yr" and not "season"
-      yr = season
+      yr = season,
+      type = if_else(week <= 17, "reg", "post"),
+      home_opening_kickoff = receive_2h_ko,
+      time = quarter_seconds_remaining,
+      runoff = 0
     ) %>%
     ungroup() %>%
     filter(down == 4, game_seconds_remaining > 30, 
            !is.na(half_seconds_remaining), !is.na(qtr), !is.na(posteam)) %>%
-    mutate(go = rush + pass) %>%
+    mutate(
+      go = rush + pass,
+      go = if_else(play_type_nfl %in% c("PUNT", "FIELD_GOAL"), 0, go)
+      ) %>%
     group_by(posteam, game_id, series) %>%
     mutate(go = max(go)) %>%
     dplyr::slice(1) %>%

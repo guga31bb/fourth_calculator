@@ -5,18 +5,14 @@ source('bot/bot_functions.R')
 # get live games
 live_games <- readRDS(url(
   "http://www.habitatring.com/games_alt.rds"
-  # "https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"
 )) %>% 
   dplyr::filter(
-    
-    # this probably isn't necessary but whatever
-    season == 2020,
     
     # hasn't finished yet
     is.na(result),
     
     # happening today
-    gameday == as.character(lubridate::today())
+    gameday == as.character(lubridate::today("US/Pacific"))
     
     ) %>%
   dplyr::mutate(
@@ -31,23 +27,9 @@ live_games <- readRDS(url(
       current_hour == game_hour & current_minute >= game_minute + 5 ~ 1,
       TRUE ~ 0
     ),
+    # 
     espn = dplyr::case_when(
-      game_id == "2020_07_PIT_TEN" ~ "401249063",
-      game_id == "2020_10_WAS_DET" ~ "401220289",
-      # wc playoffs
-      game_id == "2020_18_IND_BUF" ~ "401220393",
-      game_id == "2020_18_LA_SEA"  ~ "401220372",
-      game_id == "2020_18_TB_WAS"  ~ "401220371",
-      game_id == "2020_18_BAL_TEN" ~ "401220396",
-      game_id == "2020_18_CHI_NO"  ~ "401220395",
-      game_id == "2020_18_CLE_PIT" ~ "401220394",
-      # div playoffs
-      game_id == "2020_19_LA_GB"   ~ "401220398",
-      game_id == "2020_19_BAL_BUF" ~ "401220397",
-      game_id == "2020_19_CLE_KC"  ~ "401220400",
-      game_id == "2020_19_TB_NO"   ~ "401220399",
-      game_id == "2020_20_TB_GB"   ~ "401220402",
-      game_id == "2020_20_BUF_KC"  ~ "401220401",
+      # hard code for playoff games not in Lee's file
       game_id == "2020_21_KC_TB"   ~ "401220403",
       TRUE ~ espn
       )
@@ -58,11 +40,10 @@ live_games <- readRDS(url(
 # for testing
 # live_games <- readRDS(url(
 #   "http://www.habitatring.com/games_alt.rds"
-#   # "https://github.com/leesharpe/nfldata/blob/master/data/games.rds?raw=true"
 # )) %>%
 #   dplyr::filter(
 #     season == 2020,
-#     week == 7,
+#     week == 21,
 #     !is.na(result)
 #   ) %>%
 #   # head(10) %>%
@@ -70,6 +51,7 @@ live_games <- readRDS(url(
 
 if (nrow(live_games) > 0) {
   
+  # get all the 4th down functions here
   source('R/helpers.R')
   
   # get list of old plays before we do anything
@@ -78,20 +60,22 @@ if (nrow(live_games) > 0) {
     # read the file if it exists
     old_plays <- readRDS("bot/old_plays.rds")
     
-    # if it's just an empty df, just make an empty one
+    # if it's just an empty df, make a dummy df
+    # this prevents errors down the line
     if (!"game_id" %in% names(old_plays)) {
       old_plays <- tibble::tibble(
         "game_id" = as.character("XXXXXX"),
         "index" = as.integer(0),
         "old" = as.integer(1)
       )
-    # if it already exists, take game id and index
+    # if existing plays file looks okay, take game id and index
     } else {
       old_plays <- old_plays %>%
         dplyr::select(game_id, index) %>%
         dplyr::mutate(old = 1)
     }
   } else {
+    # if file doesn't exist, make the dummy df to prevent join errors later
     # this is so we can remove the file if we want to start over
     old_plays <- tibble::tibble(
       "game_id" = as.character("XXXXXX"),
@@ -99,8 +83,6 @@ if (nrow(live_games) > 0) {
       "old" = as.integer(1)
     )
   }
-  
-
   
   # get updated plays from ongoing games
   plays <- map_df(1 : nrow(live_games), function(x) {
@@ -117,11 +99,12 @@ if (nrow(live_games) > 0) {
     filter(is.na(old))
   
   # see the plays lined up
-  for_tweeting
+  # for_tweeting
   
   # for testing: limited to a few tweets
   # for_tweeting <- for_tweeting %>% head(5)
   
+  # if there are plays to tweet, load the library and tweet
   if (nrow(for_tweeting) > 0) {
     
     suppressMessages(
