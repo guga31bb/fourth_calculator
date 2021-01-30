@@ -4,6 +4,7 @@ library(future)
 library(ggtext)
 library(ggpmisc)
 library(DescTools)
+library(ggthemes)
 
 source('R/helpers.R')
 source("https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R")
@@ -13,17 +14,13 @@ source('R/season_numbers_functions.R')
 # the first part: numbers for one season only (2020 here)
 # get list of plays
 
-# new addition 18 dec 2020: current season function which saves calculations that have been done already
-# so if you run this one week and again the next week, it will only have to do calculations for the new games
-# do not use this function with older seasons, use get_season as shown below
-# or just load the data provided in this repo
+# this will load the dataframe that I've already created for this season
+# and if it's out of date, add any new plays
 cleaned <- get_current_season(2020)
 
 # **************************************************************************************
 # decision-making table
-
-# this is just for table titles now
-s = 2020
+# do coaches follow the bot?
 
 t <- cleaned %>%
   filter(
@@ -75,7 +72,7 @@ t <- cleaned %>%
     align = "center"
   ) %>% 
   tab_header(
-    title = md(glue::glue("NFL team decision-making by go recommendation, {s}"))
+    title = md(glue::glue("NFL team decision-making by go recommendation, {max(cleaned$season)}"))
   ) %>%
   tab_source_note(md('**Notes**: "Definitely" recommendations are greater than 4 percentage point advantage,<br> "probably" 1-4 percentage points'))
 
@@ -87,10 +84,14 @@ t %>% gtsave("figures/team_behavior.png")
 # **************************************************************************************
 # worst decisions table
 
+# note: ben changed this to just look at playoff games for now
+# remove the week filter to look at whole season
 t <- cleaned %>%
   filter(
+    # FOR PLAYOFFS ONLY
     week > 17,
-    # play_type != "PENALTY",
+    # END FOR PLAYOFFS ONLY
+    
     go == 0,
     # they tried to go for it
     !(posteam == "ARI" & week == 3 & play_id == 2364)
@@ -165,25 +166,12 @@ t <- cleaned %>%
     align = "center"
   ) %>% 
   tab_header(
-    title = md(glue::glue("Worst kick decisions of {s} playoffs"))
+    title = md(glue::glue("Worst kick decisions of {max(cleaned$season)} playoffs"))
   )
 
 t
 
 t %>% gtsave("figures/team_worst.png")
-
-# take a look at the worst decisions
-cleaned %>%
-  filter(
-    play_type != "PENALTY",
-    go == 0
-  ) %>%
-  mutate(
-    defteam = if_else(posteam == home_team, away_team, home_team)
-  ) %>%
-  arrange(-go_boost) %>%
-  head(5) %>% 
-  select(game_id, url, go_boost, desc)
 
 
 # **************************************************************************************
@@ -271,7 +259,6 @@ current <- cleaned %>%
   mutate(rank = 1:n()) %>%
   arrange(posteam)
 
-
 ids <- nflfastR::teams_colors_logos %>%
   filter(!team_abbr %in% c('LAR', 'OAK', 'SD', 'STL'))
 images <- magick::image_read(ids%>% pull(team_logo_espn)) 
@@ -286,7 +273,7 @@ logos <- tibble(
     })
 )
 
-my_title <- glue::glue("Which teams <span style='color:red'>go for it</span> when they <span style='color:red'>should?</span> {s}")
+my_title <- glue::glue("Which teams <span style='color:red'>go for it</span> when they <span style='color:red'>should?</span> {max(cleaned$season)}")
 ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   geom_col(data = current, aes(fill = ifelse(posteam=="SEA", team_color2, team_color)), 
            width = 0.5, alpha = .6, show.legend = FALSE
@@ -304,7 +291,6 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
     axis.text.x=element_blank(),
     axis.ticks.x=element_blank()
     ) +
-  # scale_y_continuous(expand=c(0,0), limits=c(0, max(current$go + 5))) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
   labs(
     x = "",
@@ -315,10 +301,10 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   ) +
   geom_text(data = current, aes(x = rank, y = -.015, size=.04, label = glue::glue("({n})")), show.legend = FALSE, nudge_x = 0, color="black")
 
-ggsave(glue::glue("figures/teams_{s}.png"))
+ggsave(glue::glue("figures/teams_{max(cleaned$season)}.png"))
 
 
-# total WP lost
+# total WP lost per game figure
 current <- cleaned %>%
   # FOR PLAYOFFS ONLY
   # filter(week > 17) %>%
@@ -342,12 +328,10 @@ current <- cleaned %>%
   mutate(rank = 1:n()) %>%
   arrange(posteam)
 
-
 ids <- nflfastR::teams_colors_logos %>%
   filter(!team_abbr %in% c('LAR', 'OAK', 'SD', 'STL')) %>%
   filter(team_abbr %in% current$posteam)
 images <- magick::image_read(ids%>% pull(team_logo_espn)) 
-
 
 logos <- tibble(
   x = current$rank + .25, 
@@ -359,7 +343,7 @@ logos <- tibble(
     })
 )
 
-my_title <- glue::glue("Expected win probability per game <span style='color:red'>lost by kicking in go situations</span>, {s}")
+my_title <- glue::glue("Expected win probability per game <span style='color:red'>lost by kicking in go situations</span>, {max(cleaned$season)}")
 ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
   geom_col(data = current, aes(fill = ifelse(posteam=="SEA", team_color2, team_color)), 
            width = 0.5, alpha = .6, show.legend = FALSE
@@ -386,8 +370,7 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
     caption = glue::glue("@benbbaldwin | Excl. final 30 seconds of game")
   )
 
-ggsave(glue::glue("figures/teams_lost_{s}.png"))
-
+ggsave(glue::glue("figures/teams_lost_{max(cleaned$season)}.png"))
 
 
 # ***********************************************************************************************************************
@@ -417,7 +400,7 @@ cleaned_all <- bind_rows(
 )
 
 
-# team over time
+# for looking at a team over time
 current <- cleaned_all %>%
   filter(go_boost > 1.5) %>%
   filter(prior_wp > .2) %>%
@@ -482,15 +465,14 @@ make_timeline <- function(team) {
   
 }
 
+# can change this to any team. automatically saves imgine in figures/team_timelines/
 make_timeline("PHI")
 
 
+# for getting lost WP in an older season. change y to what you want (back to 2014)
 y = 2018
 # total WP lost
 current <- cleaned_all %>%
-  mutate(
-    season = substr(game_id, 1, 4) %>% as.numeric()
-  ) %>%
   filter(go_boost > 0, go == 0, season == y) %>%
   group_by(posteam) %>%
   summarize(go = sum(go_boost), n = n()) %>%
@@ -541,9 +523,6 @@ ggsave(glue::glue("figures/teams_lost_{y}.png"))
 
 
 
-
-
-
 # ********************************************************************
 # total WP lost in playoff games
 current <- cleaned_all %>%
@@ -569,6 +548,7 @@ current <- cleaned_all %>%
     week == 21 ~ "SB"
   ))
 
+# to split decisions up into two columns so the figure isn't so long
 d <- bind_cols(
   current %>% dplyr::slice(1:10),
   current %>% dplyr::slice(11:20)
@@ -708,15 +688,7 @@ cleaned_all %>%
 
   annotate("text",x=-1.2, y= 70, label = "Should\nkick", color="black", size = 5) +
   annotate("text",x=1.2, y= 70, label = "Should\ngo for it", color="black", size = 5) +
-  
-  # annotate("text",x=6, y= 80, 
-  #          label = "NFL coaches\nin 2020", 
-  #          color="black", size = 5) +
-  # annotate("text",x=8.5, y= 40, label = "NFL coaches\nin 2014", color="black", size = 5) +
-  # 
-  # coaches getting closer to models
-  # annotate("text",x=7.5, y= 20, label = "Coaches getting\ncloser to model", color="black", size = 4) +
-  
+
   geom_segment(
     aes(x = -.1, y = 80, xend = -2, yend = 80),
     arrow = arrow(length = unit(0.05, "npc")),
@@ -729,14 +701,7 @@ cleaned_all %>%
     color = "black",
     size = 2
   )
-  # geom_segment(
-  #   aes(x = 6, y = 37, xend = 6, yend = 62),
-  #   arrow = arrow(length = unit(0.05, "npc")),
-  #   color = "black",
-  #   size = 1
-  # )
 
-  
 
 ggsave("figures/league_behavior_2014_2020.png")
 
