@@ -1,3 +1,5 @@
+# predicted go for it model
+load('data/observed_go_model.Rdata', .GlobalEnv)
 
 # the function
 get_probs <- function(p, games) {
@@ -25,7 +27,8 @@ get_probs <- function(p, games) {
     'play_type' = p$play_type_nfl,
     "type" = if_else(p$week <= 17, "reg", "post"),
     "go" = p$go,
-    "prior_wp" = p$vegas_wp
+    "prior_wp" = p$vegas_wp,
+    "pred_go" = p$pred_go
   ) %>%
     prepare_df(games) 
   
@@ -48,7 +51,7 @@ get_probs <- function(p, games) {
 prepare_data <- function(pbp) {
   
   # some prep
-  pbp %>%
+  data <- pbp %>%
     dplyr::group_by(game_id) %>%
     dplyr::mutate(
       # needed for WP model
@@ -62,7 +65,7 @@ prepare_data <- function(pbp) {
       runoff = 0
     ) %>%
     ungroup() %>%
-    filter(down == 4, game_seconds_remaining > 30, 
+    filter(down == 4, game_seconds_remaining > 10,
            !is.na(half_seconds_remaining), !is.na(qtr), !is.na(posteam)) %>%
     mutate(
       go = rush + pass,
@@ -79,8 +82,13 @@ prepare_data <- function(pbp) {
       . %in% "SD" ~ "LAC",
       . %in% "OAK" ~ "LV",
       TRUE ~ .
-    ))) %>%
-    return()
+    )))
+  
+  data$pred_go <- predict(fit_fourth, data %>% prepare_glm(), type="response")
+  
+  return(data)
+
+  
 }
 
 # for cleaning after getting the probs
@@ -104,7 +112,7 @@ clean_data <- function(fourth_downs) {
       should_go = if_else(go_boost > 0, 1, 0)
     ) %>%
     select(
-      game_id, play_id, season, week, score_differential, prior_wp, url, posteam, defteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
+      game_id, play_id, season, week, pred_go, score_differential, prior_wp, url, posteam, defteam, home_team, away_team, desc, play_type, go_boost, go, should_go, yardline_100, ydstogo, qtr, mins, seconds
     ) %>%
     return()
 }
@@ -115,6 +123,7 @@ get_season <- function(s) {
   
   # get data
   plays <- readRDS(url(glue::glue("https://raw.githubusercontent.com/guga31bb/nflfastR-data/master/data/play_by_play_{s}.rds"))) %>%
+    get_pred_go() %>%
     prepare_data()
   
   # add probs to data
@@ -188,11 +197,43 @@ get_current_season <- function(s) {
     return(existing_plays)
   }
   
-
-  
-  
 }
 
 
-
+# get data ready for predicted 4th down model
+prepare_glm <- function(df) {
+  
+  df %>%
+    mutate(
+      # this is all completely arbitrary
+      # but not actually used in the "should go for it" model so YOLO
+      # this is only used in some figures looking at when teams go versus when
+      # they would be expected to go based on historical team behavior
+      bin_ytg = case_when(
+        ydstogo == 1 ~ 1,
+        ydstogo == 2 ~ 2,
+        ydstogo == 3 ~ 3,
+        between(ydstogo, 4, 6) ~ 4,
+        between(ydstogo, 7, 10) ~ 5,
+        ydstogo > 10 ~ 6
+      ),
+      bin_ytg = as_factor(bin_ytg),
+      bin_scorediff = case_when(
+        score_differential < -16 ~ 0,
+        between(score_differential, -16, -9) ~ 1,
+        between(score_differential, -8, -6) ~ 2,
+        between(score_differential, -5, -4) ~ 3,
+        between(score_differential, -3, -1) ~ 4,
+        score_differential == 0 ~ 5,
+        between(score_differential, 1, 3) ~ 6,
+        between(score_differential, 4, 5) ~ 7,
+        between(score_differential, 6, 8) ~ 8,
+        between(score_differential, 9, 16) ~ 9,
+        score_differential > 16 ~ 10
+      ),
+      bin_scorediff = as_factor(bin_scorediff),
+      week = if_else(week > 17, 18, as.double(week))
+    )
+  
+}
 

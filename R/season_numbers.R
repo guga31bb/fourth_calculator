@@ -10,6 +10,15 @@ source('R/helpers.R')
 source("https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R")
 source('R/season_numbers_functions.R')
 
+theme_ben <- theme_fivethirtyeight() +
+  theme(
+    legend.position = "none",
+    plot.title = element_markdown(size = 22, hjust = 0.5),
+    plot.subtitle = element_markdown(size = 12, hjust = 0.5),
+    axis.title.x = element_text(size=12, face="bold"),
+    axis.title.y = element_text(size=12, face="bold")
+  )
+
 # **************************************************************************************
 # the first part: numbers for one season only (2020 here)
 # get list of plays
@@ -175,6 +184,101 @@ t %>% gtsave("figures/team_worst.png")
 
 
 # **************************************************************************************
+# best decisions table
+
+# remove the week filter to look at whole season
+t <- cleaned %>%
+  filter(
+    # FOR PLAYOFFS ONLY
+    # week > 17,
+    # END FOR PLAYOFFS ONLY
+    
+    go == 1,
+    # they tried to go for it
+    !(posteam == "ARI" & week == 3 & play_id == 2364)
+  ) %>%
+  mutate(
+    defteam = if_else(posteam == home_team, away_team, home_team)
+  ) %>%
+  arrange(-go_boost) %>%
+  mutate(rank = 1 : n()) %>%
+  head(10) %>%
+  select(rank, posteam, defteam, week, qtr, ydstogo, diff = score_differential, go_boost, desc) %>%
+  gt() %>%
+  cols_label(
+    rank = "",
+    posteam = "Team",
+    defteam = "Opp",
+    week = "Week",
+    qtr = "Qtr",
+    ydstogo = "YTG",
+    diff = "Diff",
+    desc = "Play",
+    go_boost = "WP gain"
+  ) %>%
+  tab_style(
+    style = cell_text(color = "black", weight = "bold"),
+    locations = list(
+      cells_row_groups(),
+      cells_column_labels(everything())
+    )
+  ) %>% 
+  text_transform(
+    locations = cells_body(vars(posteam)),
+    fn = function(x) web_image(url = paste0('https://a.espncdn.com/i/teamlogos/nfl/500/',x,'.png'))
+  ) %>% 
+  text_transform(
+    locations = cells_body(vars(defteam)),
+    fn = function(x) web_image(url = paste0('https://a.espncdn.com/i/teamlogos/nfl/500/',x,'.png'))
+  ) %>% 
+  cols_width(
+    everything() ~ px(400),
+  ) %>% 
+  cols_width(
+    vars(rank) ~ px(30),
+    vars(posteam) ~ px(50),
+    vars(defteam) ~ px(50),
+    vars(week) ~ px(50),
+    vars(diff) ~ px(50),
+    vars(qtr) ~ px(50),
+    vars(ydstogo) ~ px(50),
+    vars(go_boost) ~ px(70)
+  ) %>% 
+  tab_options(
+    row_group.border.top.width = px(3),
+    row_group.border.top.color = "black",
+    row_group.border.bottom.color = "black",
+    table_body.hlines.color = "white",
+    table.border.top.color = "black",
+    table.border.top.width = px(1),
+    table.border.bottom.color = "white",
+    table.border.bottom.width = px(1),
+    column_labels.border.bottom.color = "black",
+    column_labels.border.bottom.width = px(2),
+    row.striping.background_color = '#FFFFFF',
+    row.striping.include_table_body = TRUE,
+    table.background.color = '#F2F2F2',
+    table.font.size = px(13L),
+    data_row.padding = px(3)
+  ) %>%
+  fmt_number(
+    columns = vars(go_boost), decimals = 1
+  ) %>%
+  cols_align(
+    columns = 1:8,
+    align = "center"
+  ) %>% 
+  tab_header(
+    title = md(glue::glue("Best go-for-it decisions of {max(cleaned$season)}"))
+  )
+
+t
+
+t %>% gtsave("figures/team_best.png")
+
+
+
+# **************************************************************************************
 # league behavior by go recommendation
 
 my_title <- glue::glue("NFL Go-for-it Rate on <span style='color:red'>4th down</span>")
@@ -193,20 +297,15 @@ plot <- cleaned %>%
 plot %>%
   ggplot(aes(go_boost, go, color = as.factor(should_go))) + 
   geom_point(size = 5, color = "black", alpha = .5) +
-  geom_vline(xintercept = 0)+
+  geom_vline(xintercept = 0) +
   geom_smooth(method = "lm", show.legend = F, se = F, size = 3)+
-  theme_bw()+
+  theme_ben +
   labs(x = "Gain in win probability by going for it",
        y = "Go-for-it percentage",
        caption = paste0("Figure: @benbbaldwin"),
        subtitle = "By strength of @ben_bot_baldwin recommendation, 2020",
        title = my_title) +
-  theme(
-    legend.position = "none",
-    plot.title = element_markdown(size = 22, hjust = 0.5),
-    plot.subtitle = element_markdown(size = 12, hjust = 0.5)
-  ) +
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10), expand = c(0,2)) +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(-10, 10), expand = c(0,0)) +
   annotate("text",x=-4, y= 90, label = "Should\nkick", color="red", size = 7) +
   annotate("text",x=3, y= 90, label = "Should\ngo for it", color="red", size = 7) +
@@ -245,6 +344,35 @@ cleaned %>%
 
 ggsave("figures/league_behavior_wp.png")
 
+# #########################################################################
+# team go by predicted go
+
+get_fig <- function(tm) {
+  
+  nick <- nflfastR::teams_colors_logos %>% filter(team_abbr == tm) %>% pull(team_nick)
+  my_title <- glue::glue("<span style='color:red'>{nick}</span> fourth down decisions, 2020")
+  cleaned %>% 
+    filter(posteam == tm) %>%
+    mutate(go = if_else(go == 1, "Yes", "No")) %>%
+    select(game_id, go, pred_go, yardline_100, score_differential, ydstogo, desc) %>%
+    ggplot(aes(x = go, y=pred_go, color=go, shape=go)) +
+    geom_jitter(aes(y = pred_go, fill = go), 
+                size = 6, width = 0.25, show.legend=FALSE, alpha=.8) +
+    scale_y_continuous(name = "Predicted likelihood of going for it", breaks = scales::pretty_breaks(n = 5)) +
+    theme_ben +
+    labs(title = my_title,
+         x = "Went for it",
+         caption = "Predicted go based on observed team behavior\nbased on time, score, field position, week, and season"
+    ) # +
+    # annotate("text", x = "No", y = .83, label = "4th & 8", size = 6)
+}
+
+
+get_fig("SEA")
+
+ggsave("figures/go_vs_exp.png")
+
+
 # ###################################################### #######################
 # ############## team bar chart
 current <- cleaned %>%
@@ -282,11 +410,11 @@ ggplot(data = current, aes(x = reorder(posteam, -go), y = go)) +
             aes(x, y, label = grob, vp.width = width),
             hjust = 0.7) +
   scale_fill_identity(aesthetics = c("fill", "colour")) +
-  theme_bw() +
+  theme_ben +
   theme(
     panel.grid.major.x = element_blank(),
-    plot.title = element_markdown(size=22,face = 2,hjust=.5),
-    plot.subtitle = element_text(size=8, hjust=.5),
+    #plot.title = element_markdown(size=22,face = 2,hjust=.5),
+    #plot.subtitle = element_text(size=8, hjust=.5),
     axis.title.x=element_blank(),
     axis.text.x=element_blank(),
     axis.ticks.x=element_blank()
@@ -680,7 +808,6 @@ cleaned_all %>%
     plot.subtitle = element_markdown(size = 12, hjust = 0.5),
     axis.title.x = element_text(size=12, face="bold"),
     axis.title.y = element_text(size=12, face="bold")
-    
   ) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 4), expand = c(0,0)) +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 10), limits = c(-10, 10), expand = c(0,0)) +
