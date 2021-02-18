@@ -5,6 +5,7 @@ library(ggtext)
 library(ggpmisc)
 library(DescTools)
 library(ggthemes)
+library(magick)
 
 source('R/helpers.R')
 source("https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R")
@@ -363,8 +364,7 @@ get_fig <- function(tm) {
     labs(title = my_title,
          x = "Went for it",
          caption = "Predicted go based on observed team behavior\nbased on time, score, field position, week, and season"
-    ) # +
-    # annotate("text", x = "No", y = .83, label = "4th & 8", size = 6)
+    )
 }
 
 
@@ -372,6 +372,136 @@ get_fig("SEA")
 
 ggsave("figures/go_vs_exp.png")
 
+# ############################### above but by conference
+# get divisions
+divs <- teamcolors::teamcolors %>%
+  filter(league == "nfl") %>%
+  select(name, division) %>%
+  mutate(name = case_when(
+    name == "Washington Redskins" ~ "Washington Football Team",
+    name == "Oakland Raiders" ~ "Las Vegas Raiders",
+    TRUE ~ name
+  ))
+
+nfl_logos_df <- nflfastR::teams_colors_logos %>%
+  filter(!(team_abbr %in% c("LAR", "SD", "OAK"))) %>%
+  left_join(divs, by = c("team_name" = "name"))
+
+
+get_conf <- function(conf) {
+  
+  logos_conf <- image_read(nfl_logos_df %>% filter(substr(division, 1, 3) == conf) %>% pull(team_logo_espn))
+  my_title <- glue::glue("<span style='color:red'>{conf}</span> fourth down decisions, 2020")
+  
+  cleaned %>% 
+    left_join(nfl_logos_df, by = c("posteam" = "team_abbr")) %>%
+    filter(substr(division, 1, 3) == conf) %>%
+    mutate(go = if_else(go == 1, "Yes", "No")) %>%
+    select(game_id, posteam, team_logo_espn, go, pred_go, yardline_100, score_differential, ydstogo, desc) %>%
+    ggplot(aes(x = posteam, y=pred_go, color=go)) +
+    geom_jitter(aes(y = pred_go, fill = go), 
+                size = 4, width = 0.125, show.legend=FALSE, alpha=.5) +
+    scale_y_continuous(name = "Predicted likelihood of going for it", breaks = scales::pretty_breaks(n = 5), expand = c(0,.03)) +
+    theme_ben +
+    labs(title = my_title,
+         x = "Went for it",
+         subtitle = "<span style='color:#F8766D'>Kicked</span> versus <span style='color:#00BFC4'>went for it</span>",
+         caption = "Predicted go based on past league behavior given\nyardage, time, score, field position, week, and season"
+    ) +
+    theme(
+      panel.grid.major = element_blank(),
+      plot.subtitle = element_markdown(size = 16, hjust = 0.5),
+      axis.title.x=element_blank(),
+      axis.text.x=element_blank(),
+      axis.ticks.x=element_blank()
+    ) +
+    geom_hline(yintercept = -0.1, color = "gray", alpha = .1) +
+    # doing this in a smart way is annoying so just brute forcing it
+    draw_image(logos_conf[1],  x = .5, y = -.55, scale = .95) +
+    draw_image(logos_conf[2],  x = 1.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[3],  x = 2.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[4],  x = 3.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[5],  x = 4.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[6],  x = 5.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[7],  x = 6.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[8],  x = 7.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[9],  x = 8.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[10],  x = 9.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[11],  x = 10.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[12],  x = 11.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[13],  x = 12.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[14],  x = 13.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[15],  x = 14.5, y = -.55, scale = .95) +
+    draw_image(logos_conf[16],  x = 15.5, y = -.55, scale = .95)
+  
+}
+
+get_conf("AFC")
+ggsave("figures/go_vs_exp_afc.png")
+
+
+get_conf("NFC")
+ggsave("figures/go_vs_exp_nfc.png")
+
+
+# ############################### above but by bot rec rather than predicted
+
+
+follow_bot <- function(conf) {
+  
+  logos_conf <- image_read(nfl_logos_df %>% filter(substr(division, 1, 3) == conf) %>% pull(team_logo_espn))
+  my_title <- glue::glue("<span style='color:red'>{conf}</span>: when did teams follow the bot? 2020")
+  
+  cleaned %>% 
+    left_join(nfl_logos_df, by = c("posteam" = "team_abbr")) %>%
+    filter(substr(division, 1, 3) == conf) %>%
+    filter(between(go_boost, -5, 15)) %>%
+    mutate(go = as_factor(go)) %>%
+    select(game_id, posteam, team_logo_espn, go, go_boost, pred_go, yardline_100, score_differential, ydstogo, desc) %>%
+    ggplot(aes(x = posteam, y=go_boost, color=go)) +
+    geom_hline(yintercept = 0) +
+    geom_jitter(aes(y = go_boost, fill = go), 
+                size = 3, width = 0.2, show.legend=FALSE, alpha=.5) +
+    scale_y_continuous(name = "4th down bot gain in going for it", breaks = scales::pretty_breaks(n = 5), expand = c(0,.03)) +
+    theme_ben +
+    labs(title = my_title,
+         x = "Went for it",
+         subtitle = "<span style='color:#F8766D'>Kicked</span> versus <span style='color:#00BFC4'>went for it</span>",
+         caption = "Predicted go based on past league behavior given\nyardage, time, score, field position, week, and season"
+    ) +
+    theme(
+      panel.grid.major = element_blank(),
+      plot.subtitle = element_markdown(size = 16, hjust = 0.5),
+      axis.title.x=element_blank(),
+      axis.text.x=element_blank(),
+      axis.ticks.x=element_blank()
+    ) +
+    geom_hline(yintercept = -6, color = "gray", alpha = .1) +
+    # doing this in a smart way is annoying so just brute forcing it
+    draw_image(logos_conf[1],  x = .5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[2],  x = 1.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[3],  x = 2.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[4],  x = 3.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[5],  x = 4.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[6],  x = 5.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[7],  x = 6.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[8],  x = 7.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[9],  x = 8.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[10],  x = 9.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[11],  x = 10.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[12],  x = 11.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[13],  x = 12.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[14],  x = 13.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[15],  x = 14.5, y = -5.75, scale = 2) +
+    draw_image(logos_conf[16],  x = 15.5, y = -5.75, scale = 2)
+  
+}
+
+follow_bot("AFC")
+ggsave("figures/follow_bot_afc.png")
+
+follow_bot("NFC")
+ggsave("figures/follow_bot_nfc.png")
 
 # ###################################################### #######################
 # ############## team bar chart
