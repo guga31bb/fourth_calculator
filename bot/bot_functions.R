@@ -218,9 +218,8 @@ get_data <- function(df) {
             desc,
             type,
             qtr,
-            time,
+            quarter_seconds_remaining = time,
             posteam,
-            # yardline_side,
             away_team,
             home_team,
             yardline_100,
@@ -234,16 +233,16 @@ get_data <- function(df) {
             home_score,
             away_score,
             type_text,
-            yr
+            season = yr
           ) %>%
           # put in end of game conditions
           dplyr::mutate(
             # if there's a conversion with fewer than 5 minutes left and a lead, run off 40 seconds
-            runoff = if_else(between(time, 167, 300) & score_differential > 0 & qtr == 4, 40, runoff),
+            runoff = if_else(between(quarter_seconds_remaining, 167, 300) & score_differential > 0 & qtr == 4, 40, runoff),
             # if there's a conversion right before 2 minute warning, run down to 2 minute warning
-            runoff = if_else(between(time, 127, 166) & score_differential > 0 & qtr == 4, time - 120 - 6, runoff),
+            runoff = if_else(between(quarter_seconds_remaining, 127, 166) & score_differential > 0 & qtr == 4, quarter_seconds_remaining - 120 - 6, runoff),
             # if conversion after 2 minute warning, run down 40 seconds
-            runoff = if_else(time <= 120 & score_differential > 0 & qtr == 4, 40, runoff)
+            runoff = if_else(quarter_seconds_remaining <= 120 & score_differential > 0 & qtr == 4, 40, runoff)
           )
       )
       
@@ -279,9 +278,9 @@ get_data <- function(df) {
 # function to tweet out one play
 tweet_play <- function(df) {
   fullInput <- df %>% 
-    prepare_df(games)
+    prepare_df()
   
-  tableData <- make_table_data(fullInput, punt_df) %>%
+  tableData <- make_table_data(fullInput) %>%
     arrange(-choice_prob)
   
   play_desc <- df$desc %>%
