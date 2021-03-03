@@ -29,7 +29,7 @@ theme_ben <- theme_fivethirtyeight() +
 update_season(2020)
 
 # this will load the dataframe
-cleaned <- load_season(2020, rebuild = TRUE)
+cleaned <- load_season(2020, rebuild = FALSE)
 
 # **************************************************************************************
 # decision-making table
