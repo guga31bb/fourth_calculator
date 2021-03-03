@@ -4,30 +4,8 @@ library(splines)
 load('data/observed_go_model.Rdata', .GlobalEnv)
 
 
-# prepare raw pbp data
-prepare_nflfastr_data <- function(pbp) {
+add_pred_go <- function(data) {
   
-  # some prep
-  data <- pbp %>%
-    dplyr::group_by(game_id) %>%
-    dplyr::mutate(
-      # needed for WP model
-      home_opening_kickoff = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0),
-      type = if_else(week <= 17, "reg", "post"),
-      runoff = 0
-    ) %>%
-    ungroup() %>%
-    filter(down == 4, game_seconds_remaining > 10,
-           !is.na(half_seconds_remaining), !is.na(qtr), !is.na(posteam)) %>%
-    mutate(
-      go = rush + pass,
-      go = if_else(play_type_nfl %in% c("PUNT", "FIELD_GOAL"), 0, go)
-      ) %>%
-    group_by(posteam, game_id, series) %>%
-    mutate(series_go = max(go)) %>%
-    # dplyr::slice(1) %>%
-    ungroup()
-    
   data$pred_go <- predict(fit_fourth, data %>% prepare_glm(), type="response")
   
   return(data)
@@ -74,6 +52,7 @@ load_season <- function(s, rebuild = FALSE) {
       prepare_nflfastr_data() %>%
       prepare_df() %>%
       add_probs() %>% 
+      add_pred_go() %>%
       clean_data()
     
     saveRDS(existing_plays, glue::glue("data/decisions_{s}.rds"))
@@ -115,6 +94,7 @@ update_season <- function(s) {
     new_plays <- plays %>%
       prepare_df() %>%
       add_probs() %>% 
+      add_pred_go() %>%
       clean_data()
 
     # add to existing plays
@@ -168,15 +148,5 @@ prepare_glm <- function(df) {
       bin_scorediff = as_factor(bin_scorediff),
       week = if_else(week > 17, 18, as.double(week))
     )
-  
-}
-
-add_probs <- function(df) {
-  
-  df %>% 
-    get_go_wp() %>%
-    get_fg_wp() %>%
-    get_punt_wp() %>%
-    return()
   
 }
