@@ -1,13 +1,11 @@
 ---
-title: "Readme"
+title: "Fourth down calculator"
 output: github_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
-# Fourth down calculator
 
 This is the repository for the [fourth down calculator](https://rbsdm.com/stats/fourth_calculator) introduced in [this piece on The Athletic](https://theathletic.com/2144214/2020/10/28/nfl-fourth-down-decisions-the-math-behind-the-leagues-new-aggressiveness/). Here are the main files of interest:
 
@@ -54,6 +52,6 @@ make_table_data(pbp) %>%
 ## Example usage 2 : make the table
 
 Here's how to get the actual table on the shiny app and tweeted out by the bot.
-```{r ex2, fig.keep = 'all', dpi = 600}
+```{r ex2}
 make_table(make_table_data(pbp), pbp)
 ```
