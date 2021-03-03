@@ -52,6 +52,28 @@ make_table_data(pbp) %>%
 ## Example usage 2 : make the table
 
 Here's how to get the actual table on the shiny app and tweeted out by the bot.
-```{r ex2}
+```{r ex2, results = 'hide'}
 make_table(make_table_data(pbp), pbp)
 ```
+
+![https://pbs.twimg.com/media/Ess2ZxrXAAUgRtZ?format=png&name=small](https://pbs.twimg.com/media/Ess2ZxrXAAUgRtZ?format=png&name=small)
+
+## Example usage 3 : get results for a bunch of plays
+
+The first two functions do the cleaning steps and then `add_probs` is a wrapper that adds all the probabilities associated with each choice, with the added columns shown below:
+
+```{r batch}
+nflfastR::load_pbp(2020) %>%
+      prepare_nflfastr_data() %>%
+      prepare_df() %>%
+      add_probs() %>%
+  dplyr::slice(1:10) %>%
+  select(
+    posteam, ydstogo, yardline_100, posteam, first_down_prob, wp_fail, wp_succeed, go_wp, fg_make_prob, miss_fg_wp, make_fg_wp, fg_wp, punt_wp
+  ) %>%
+  knitr::kable(digits = 2)
+```
+
+
+
+
