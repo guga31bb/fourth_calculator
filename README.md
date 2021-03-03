@@ -64,7 +64,7 @@ field goal attempt that the Packers attempted at the end of the 2020 NFC
 Championship Game.
 
 ``` r
-source('R/helpers.R')
+source('https://raw.githubusercontent.com/guga31bb/fourth_calculator/main/R/helpers.R')
 # get the play
 pbp <- nflfastR::load_pbp(2020) %>%
   prepare_nflfastr_data() %>%
@@ -99,6 +99,7 @@ wrapper that adds all the probabilities associated with each choice,
 with the added columns shown below:
 
 ``` r
+source('https://raw.githubusercontent.com/guga31bb/fourth_calculator/main/R/helpers.R')
 nflfastR::load_pbp(2020) %>%
       prepare_nflfastr_data() %>%
       prepare_df() %>%
