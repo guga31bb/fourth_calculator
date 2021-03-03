@@ -38,7 +38,7 @@ There are some edge cases that are not accounted for. These should only make a m
 Here is the code that can look up one play. This is the controversial field goal attempt that the Packers attempted at the end of the 2020 NFC Championship Game.
 
 ```{r ex1}
-source('R/helpers.R')
+source('https://raw.githubusercontent.com/guga31bb/fourth_calculator/main/R/helpers.R')
 # get the play
 pbp <- nflfastR::load_pbp(2020) %>%
   prepare_nflfastr_data() %>%
@@ -63,6 +63,7 @@ make_table(make_table_data(pbp), pbp)
 The first two functions do the cleaning steps and then `add_probs` is a wrapper that adds all the probabilities associated with each choice, with the added columns shown below:
 
 ```{r batch}
+source('https://raw.githubusercontent.com/guga31bb/fourth_calculator/main/R/helpers.R')
 nflfastR::load_pbp(2020) %>%
       prepare_nflfastr_data() %>%
       prepare_df() %>%
