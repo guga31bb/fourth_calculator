@@ -276,7 +276,7 @@ server <- function(session, input, output) {
       tibble::tibble(
         "type" = as.character(input$type),
         "qtr" = as.integer(input$qtr),
-        "time" = 60 * as.integer(input$mins) + as.integer(input$secs),
+        "quarter_seconds_remaining" = 60 * as.integer(input$mins) + as.integer(input$secs),
         'posteam' = as.character(input$posteam),
         'away_team' = as.character(input$away),
         'home_team' = as.character(input$home),
@@ -287,9 +287,9 @@ server <- function(session, input, output) {
         'home_opening_kickoff' = as.integer(input$home_ko),
         'score_differential' = as.integer(input$score_diff),
         'runoff' = as.integer(input$runoff),
-        'yr' = as.integer(input$season)
+        'season' = as.integer(input$season)
       ) %>%
-        prepare_df(games)
+        prepare_df()
       
     } , ignoreNULL = FALSE
   )
@@ -299,7 +299,7 @@ server <- function(session, input, output) {
     input$update,
     {
       
-      make_table_data(fullInput(), punt_df)
+      make_table_data(fullInput())
       
     } , ignoreNULL = FALSE
   )
