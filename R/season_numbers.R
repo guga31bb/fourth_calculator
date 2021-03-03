@@ -6,6 +6,7 @@ library(ggpmisc)
 library(DescTools)
 library(ggthemes)
 library(magick)
+library(cowplot)
 
 source('R/helpers.R')
 source("https://raw.githubusercontent.com/mrcaseb/nflfastR/master/R/helper_add_nflscrapr_mutations.R")
@@ -24,15 +25,22 @@ theme_ben <- theme_fivethirtyeight() +
 # the first part: numbers for one season only (2020 here)
 # get list of plays
 
-# this will load the dataframe that I've already created for this season
-# and if it's out of date, add any new plays
-cleaned <- get_current_season(2020)
+# first, make sure df is up to date
+update_season(2020)
+
+# this will load the dataframe
+cleaned <- load_season(2020, rebuild = TRUE)
 
 # **************************************************************************************
 # decision-making table
 # do coaches follow the bot?
 
 t <- cleaned %>%
+  arrange(game_id, series, play_id) %>%
+  group_by(game_id, series) %>%
+  mutate(go = max(go)) %>%
+  dplyr::slice(1) %>%
+  ungroup() %>%
   filter(
     play_type != "PENALTY"
     # go_boost > 1 | go_boost < -1
@@ -638,23 +646,15 @@ ggsave(glue::glue("figures/teams_lost_{max(cleaned$season)}.png"))
 
 # the second part: numbers for every season
 
-# get old season numbers if they aren't there already
-if (!file.exists("data/prior_season_decisions.rds")) {
-  
-  # this will take a very long time
-  cleaned_old <- map_df(2014:2019, function(x) {
+cleaned_old <- map_df(2014:2019, function(x) {
     message(glue::glue("Getting season {x}. . ."))
-    get_season(x)
+    load_season(x)
   })
-  
-  saveRDS(cleaned_old, file = "data/prior_season_decisions.rds")
-  
-}
 
 # bind 2020 data to the prior season data
 cleaned_all <- bind_rows(
   cleaned,
-  readRDS("data/prior_season_decisions.rds")
+  cleaned_old
 )
 
 
@@ -724,7 +724,7 @@ make_timeline <- function(team) {
 }
 
 # can change this to any team. automatically saves imgine in figures/team_timelines/
-make_timeline("PHI")
+make_timeline("BAL")
 
 
 # for getting lost WP in an older season. change y to what you want (back to 2014)
