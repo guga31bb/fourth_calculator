@@ -90,222 +90,35 @@ the bot.
 make_table(make_table_data(pbp), pbp)
 ```
 
-<div id="ixtldnjhru" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-
-<table class="gt_table">
-
-<thead class="gt_header">
-
-<tr>
-
-<th colspan="5" class="gt_heading gt_title gt_font_normal" style>
-
-Down 8, 4th & 8, 8 yards from opponent end zone
-
-</th>
-
-</tr>
-
-<tr>
-
-<th colspan="5" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>
-
-Qtr 4, 02:09 | Timeouts: Off 3, Def 3
-
-</th>
-
-</tr>
-
-</thead>
-
-<thead class="gt_col_headings">
-
-<tr>
-
-<th class="gt_col_heading gt_center gt_columns_bottom_border" rowspan="2" colspan="1" style="color: black; font-weight: bold;">
-
-</th>
-
-<th class="gt_col_heading gt_center gt_columns_bottom_border" rowspan="2" colspan="1" style="color: black; font-weight: bold;">
-
-Win %
-
-</th>
-
-<th class="gt_col_heading gt_center gt_columns_bottom_border" rowspan="2" colspan="1" style="color: black; font-weight: bold;">
-
-Success %<sup class="gt_footnote_marks">1</sup>
-
-</th>
-
-<th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="2">
-
-<span class="gt_column_spanner">Win % if</span>
-
-</th>
-
-</tr>
-
-<tr>
-
-<th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" style="color: black; font-weight: bold;">
-
-Fail
-
-</th>
-
-<th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" style="color: black; font-weight: bold;">
-
-Succeed
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody class="gt_table_body">
-
-<tr>
-
-<td class="gt_row gt_left" style="font-weight: bold;">
-
-Go for it
-
-</td>
-
-<td class="gt_row gt_center" style="color: red; font-weight: bold;">
-
-13
-
-</td>
-
-<td class="gt_row gt_center">
-
-33
-
-</td>
-
-<td class="gt_row gt_center">
-
-4
-
-</td>
-
-<td class="gt_row gt_center">
-
-31
-
-</td>
-
-</tr>
-
-<tr>
-
-<td class="gt_row gt_left" style="font-weight: bold;">
-
-Field goal attempt
-
-</td>
-
-<td class="gt_row gt_center" style="color: red; font-weight: bold;">
-
-9
-
-</td>
-
-<td class="gt_row gt_center">
-
-98
-
-</td>
-
-<td class="gt_row gt_center">
-
-3
-
-</td>
-
-<td class="gt_row gt_center">
-
-9
-
-</td>
-
-</tr>
-
-<tr>
-
-<td class="gt_row gt_left" style="font-weight: bold;">
-
-Punt
-
-</td>
-
-<td class="gt_row gt_center" style="color: red; font-weight: bold;">
-
-NA
-
-</td>
-
-<td class="gt_row gt_center">
-
-NA
-
-</td>
-
-<td class="gt_row gt_center">
-
-NA
-
-</td>
-
-<td class="gt_row gt_center">
-
-NA
-
-</td>
-
-</tr>
-
-</tbody>
-
-<tfoot class="gt_sourcenotes">
-
-<tr>
-
-<td class="gt_sourcenote" colspan="5">
-
-<strong>Source</strong>: @ben\_bot\_baldwin
-
-</td>
-
-</tr>
-
-</tfoot>
-
-<tfoot>
-
-<tr class="gt_footnotes">
-
-<td colspan="5">
-
-<p class="gt_footnote">
-
-<sup class="gt_footnote_marks"> <em>1</em> </sup>
-
-Likelihood of converting on 4th down or of making field goal <br />
-
-</p>
-
-</td>
-
-</tr>
-
-</tfoot>
-
-</table>
-
-</div>
-
-<!--/html_preserve-->
+![<https://pbs.twimg.com/media/Ess2ZxrXAAUgRtZ?format=png&name=small>](https://pbs.twimg.com/media/Ess2ZxrXAAUgRtZ?format=png&name=small)
+
+## Example usage 3 : get results for a bunch of plays
+
+The first two functions do the cleaning steps and then `add_probs` is a
+wrapper that adds all the probabilities associated with each choice,
+with the added columns shown below:
+
+``` r
+nflfastR::load_pbp(2020) %>%
+      prepare_nflfastr_data() %>%
+      prepare_df() %>%
+      add_probs() %>%
+  dplyr::slice(1:10) %>%
+  select(
+    posteam, ydstogo, yardline_100, posteam, first_down_prob, wp_fail, wp_succeed, go_wp, fg_make_prob, miss_fg_wp, make_fg_wp, fg_wp, punt_wp
+  ) %>%
+  knitr::kable(digits = 2)
+```
+
+| posteam | ydstogo | yardline\_100 | first\_down\_prob | wp\_fail | wp\_succeed | go\_wp | fg\_make\_prob | miss\_fg\_wp | make\_fg\_wp | fg\_wp | punt\_wp |
+| :------ | ------: | ------------: | ----------------: | -------: | ----------: | -----: | -------------: | -----------: | -----------: | -----: | -------: |
+| SF      |       3 |            34 |              0.55 |     0.69 |        0.78 |   0.74 |           0.62 |         0.69 |         0.75 |   0.73 |     0.72 |
+| ARI     |      10 |            65 |              0.27 |     0.18 |        0.28 |   0.21 |           0.00 |         0.18 |         0.29 |   0.18 |     0.24 |
+| ARI     |       7 |            72 |              0.38 |     0.07 |        0.14 |   0.10 |           0.00 |         0.07 |         0.15 |   0.07 |     0.10 |
+| SF      |       5 |            64 |              0.48 |     0.84 |        0.92 |   0.88 |           0.00 |         0.83 |         0.92 |   0.83 |     0.87 |
+| SF      |       3 |            68 |              0.55 |     0.65 |        0.81 |   0.74 |           0.00 |         0.62 |         0.80 |   0.62 |     0.72 |
+| ARI     |       9 |            77 |              0.30 |     0.16 |        0.28 |   0.19 |           0.00 |         0.15 |         0.28 |   0.15 |     0.20 |
+| SF      |       1 |             1 |              0.63 |     0.78 |        0.89 |   0.85 |           0.99 |         0.76 |         0.82 |   0.82 |       NA |
+| ARI     |       5 |            34 |              0.45 |     0.19 |        0.37 |   0.27 |           0.62 |         0.19 |         0.31 |   0.27 |     0.23 |
+| SF      |       9 |            36 |              0.32 |     0.72 |        0.84 |   0.76 |           0.57 |         0.71 |         0.80 |   0.76 |     0.76 |
+| SF      |       2 |             6 |              0.54 |     0.77 |        0.89 |   0.83 |           0.98 |         0.75 |         0.81 |   0.81 |       NA |
