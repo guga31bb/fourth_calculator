@@ -842,3 +842,47 @@ make_table_2pt <- function(df, current_situation) {
   
 }
 
+
+
+
+# #########################################################################################
+# other: this isn't used by the bot or shiny app but helps get an nflfastR df read
+
+# prepare raw pbp data
+prepare_nflfastr_data <- function(pbp) {
+  
+  # some prep
+  data <- pbp %>%
+    dplyr::group_by(game_id) %>%
+    dplyr::mutate(
+      # needed for WP model
+      home_opening_kickoff = dplyr::if_else(home_team == dplyr::first(stats::na.omit(posteam)), 1, 0),
+      type = if_else(week <= 17, "reg", "post"),
+      runoff = 0
+    ) %>%
+    ungroup() %>%
+    filter(down == 4, game_seconds_remaining > 10,
+           !is.na(half_seconds_remaining), !is.na(qtr), !is.na(posteam)) %>%
+    mutate(
+      go = rush + pass,
+      go = if_else(play_type_nfl %in% c("PUNT", "FIELD_GOAL"), 0, go)
+    ) %>%
+    group_by(posteam, game_id, series) %>%
+    mutate(series_go = max(go)) %>%
+    # dplyr::slice(1) %>%
+    ungroup()
+  
+  return(data)
+  
+}
+
+# convenience function to add the probs from each model
+add_probs <- function(df) {
+  
+  df %>% 
+    get_go_wp() %>%
+    get_fg_wp() %>%
+    get_punt_wp() %>%
+    return()
+  
+}
