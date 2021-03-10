@@ -7,74 +7,15 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This is the repository for the [fourth down calculator](https://rbsdm.com/stats/fourth_calculator) introduced in [this piece on The Athletic](https://theathletic.com/2144214/2020/10/28/nfl-fourth-down-decisions-the-math-behind-the-leagues-new-aggressiveness/). Here are the main files of interest:
-
-* [Model for yards gained on fourth down go decision](https://github.com/guga31bb/fourth_calculator/blob/main/R/_go_for_it_model.R)
-* [Modeling punt and field goal outcomes](https://github.com/guga31bb/fourth_calculator/blob/main/R/punts.R)
-* [Code for generating the figures and tables in The Athletic piece](https://github.com/guga31bb/fourth_calculator/blob/main/R/_the_athletic_post.R)
-* [The logic of the Shiny app](https://github.com/guga31bb/fourth_calculator/blob/main/app.R) which is located [here](https://rbsdm.com/stats/fourth_calculator/)
-* [The functions that do the win probability calculations](https://github.com/guga31bb/fourth_calculator/blob/main/R/helpers.R)
+This is the repository for the [Shiny app](https://rbsdm.com/stats/fourth_calculator) and [4th down bot](http://twitter.com/ben_bot_baldwin) introduced in [this piece on The Athletic](https://theathletic.com/2144214/2020/10/28/nfl-fourth-down-decisions-the-math-behind-the-leagues-new-aggressiveness/). 
 
 The code that powers the Twitter fourth down bot [is in this folder here](https://github.com/guga31bb/fourth_calculator/tree/main/bot).
 
-To get starting using the code, I would recommend **cloning this repository** (which gets the dataframes with 4th down calculations already applied) and then going through [my file analyzing the  data](https://github.com/guga31bb/fourth_calculator/blob/main/R/season_numbers.R).
+The website and bot use [`nfl4th`](https://www.nfl4th.com/) to calculate the probabilities. Research using the package [can be found here](https://www.nfl4th.com/articles/articles/4th-down-research.html).
 
-## Features
+## Models
 
-* The **go for it** model gives probabilities for possibilities of yards gained and includes the possibility of earning a first down via defensive penalty
-* The **punt** model includes the possibility for getting blocked, returned for a touchdown, or fumbled on the return
-* The **field goal** model is a simple model of field goal % by distance and roof type
+Here is the code that generates the various models:
 
-## Current limitations
-
-There are some edge cases that are not accounted for. These should only make a marginal difference to the recommendations as they are largely edge cases (e.g. the possibility for a field goal to be blocked and returned).
-
-* The **go for it** model does not allow for the possibility of a turnover return. However, long returns are extremely rare: For example, in 2018 and 2019 there were only four defensive touchdowns on plays where teams went for fourth downs out of 1,236 plays, and all of these happened when the game was well in hand for the other team.
-* The **punt** model doesn’t account for the punter or returner, ignores penalties on returns and ignores the potential for blocked punts to be returned for touchdowns
-* The **field goal** model doesn’t account for who the kicker is, what the weather is (only relevant for outdoor games), or the possibility of a kick being blocked and returned for a touchdown
-
-## Example usage 1: from nflfastR data
-
-Here is the code that can look up one play. This is the controversial field goal attempt that the Packers attempted at the end of the 2020 NFC Championship Game.
-
-```{r ex1}
-source('https://raw.githubusercontent.com/guga31bb/fourth_calculator/main/R/helpers.R')
-# get the play
-pbp <- nflfastR::load_pbp(2020) %>%
-  prepare_nflfastr_data() %>%
-  filter(week == 20, posteam == "GB", qtr == 4, ydstogo == 8) %>%
-  prepare_df()
-
-make_table_data(pbp) %>%
-  knitr::kable(digits = 1)
-```
-
-## Example usage 2 : make the table
-
-Here's how to get the actual table on the shiny app and tweeted out by the bot.
-```{r ex2, results = 'hide'}
-make_table(make_table_data(pbp), pbp)
-```
-
-![https://pbs.twimg.com/media/Ess2ZxrXAAUgRtZ?format=png&name=small](https://pbs.twimg.com/media/Ess2ZxrXAAUgRtZ?format=png&name=small)
-
-## Example usage 3 : get results for a bunch of plays
-
-The first two functions do the cleaning steps and then `add_probs` is a wrapper that adds all the probabilities associated with each choice, with the added columns shown below:
-
-```{r batch}
-source('https://raw.githubusercontent.com/guga31bb/fourth_calculator/main/R/helpers.R')
-nflfastR::load_pbp(2020) %>%
-      prepare_nflfastr_data() %>%
-      prepare_df() %>%
-      add_probs() %>%
-  dplyr::slice(1:10) %>%
-  select(
-    posteam, ydstogo, yardline_100, posteam, first_down_prob, wp_fail, wp_succeed, go_wp, fg_make_prob, miss_fg_wp, make_fg_wp, fg_wp, punt_wp
-  ) %>%
-  knitr::kable(digits = 2)
-```
-
-
-
-
+* [Going for 4th down and going for 2 points](https://github.com/guga31bb/fourth_calculator/blob/main/R/_go_for_it_model.R)
+* [Punting and kicking a field goal](https://github.com/guga31bb/fourth_calculator/blob/main/R/punts.R)
