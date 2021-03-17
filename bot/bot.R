@@ -85,9 +85,9 @@ if (nrow(live_games) > 0) {
   }
   
   # get updated plays from ongoing games
-  plays <- map_df(1 : nrow(live_games), function(x) {
+  plays <- purrr::map_df(1 : nrow(live_games), function(x) {
     message(glue::glue("{x}: game {live_games %>% dplyr::slice(x) %>% pull(game_id)}"))
-    get_data(live_games %>% dplyr::slice(x))
+    nfl4th::get_4th_plays(live_games %>% dplyr::slice(x) %>% pull(game_id))
   })
   
   # save updated list of plays we've done
