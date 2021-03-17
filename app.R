@@ -288,8 +288,7 @@ server <- function(session, input, output) {
         'score_differential' = as.integer(input$score_diff),
         'runoff' = as.integer(input$runoff),
         'season' = as.integer(input$season)
-      ) %>%
-        prepare_df()
+      )
       
     } , ignoreNULL = FALSE
   )
@@ -299,7 +298,9 @@ server <- function(session, input, output) {
     input$update,
     {
       
-      make_table_data(fullInput())
+      fullInput() %>%
+        nfl4th::add_4th_probs() %>%
+        nfl4th::make_table_data()
       
     } , ignoreNULL = FALSE
   )
@@ -314,7 +315,9 @@ server <- function(session, input, output) {
     input$update,
     {
       
-      make_2pt_table_data(fullInput())
+     fullInput() %>%
+        nfl4th::add_2pt_probs() %>%
+        nfl4th::make_2pt_table_data()
       
     } , ignoreNULL = FALSE
   )
