@@ -5,15 +5,15 @@ source('bot/bot_functions.R')
 # get live games
 live_games <- readRDS(url(
   "http://www.habitatring.com/games_alt.rds"
-)) %>% 
+)) %>%
   dplyr::filter(
-    
+
     # hasn't finished yet
     is.na(result),
-    
+
     # happening today
     gameday == as.character(lubridate::today("US/Pacific"))
-    
+
     ) %>%
   dplyr::mutate(
     # there's probably a better way to do this but it seems to work
@@ -27,7 +27,7 @@ live_games <- readRDS(url(
       current_hour == game_hour & current_minute >= game_minute + 5 ~ 1,
       TRUE ~ 0
     ),
-    # 
+    #
     espn = dplyr::case_when(
       # hard code for playoff games not in Lee's file
       game_id == "2020_21_KC_TB"   ~ "401220403",
@@ -50,16 +50,16 @@ live_games <- readRDS(url(
 #   dplyr::select(game_id, espn, home_team, away_team, week)
 
 if (nrow(live_games) > 0) {
-  
+
   # get all the 4th down functions here
-  source('R/helpers.R')
-  
+  source('scripts/helpers.R')
+
   # get list of old plays before we do anything
   if (file.exists("bot/old_plays.rds")) {
-    
+
     # read the file if it exists
     old_plays <- readRDS("bot/old_plays.rds")
-    
+
     # if it's just an empty df, make a dummy df
     # this prevents errors down the line
     if (!"game_id" %in% names(old_plays)) {
@@ -83,41 +83,41 @@ if (nrow(live_games) > 0) {
       "old" = as.integer(1)
     )
   }
-  
+
   # get updated plays from ongoing games
   plays <- purrr::map_df(1 : nrow(live_games), function(x) {
     message(glue::glue("{x}: game {live_games %>% dplyr::slice(x) %>% pull(game_id)}"))
     nfl4th::get_4th_plays(live_games %>% dplyr::slice(x) %>% pull(game_id))
   })
-  
+
   # save updated list of plays we've done
   saveRDS(plays, "bot/old_plays.rds")
-  
+
   # get plays we haven't tweeted yet
   for_tweeting <- plays %>%
     left_join(old_plays, by = c("game_id", "index")) %>%
     filter(is.na(old))
-  
+
   # see the plays lined up
   # for_tweeting
-  
+
   # for testing: limited to a few tweets
   # for_tweeting <- for_tweeting %>% head(5)
-  
+
   # if there are plays to tweet, load the library and tweet
   if (nrow(for_tweeting) > 0) {
-    
+
     suppressMessages(
       library(rtweet)
     )
-    
+
     # do the thing
     for (x in 1 : nrow(for_tweeting)) {
       tweet_play(for_tweeting %>% dplyr::slice(x))
     }
-    
+
   }
-  
+
 }
 
 
