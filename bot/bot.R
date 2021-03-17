@@ -38,16 +38,8 @@ live_games <- readRDS(url(
   dplyr::select(game_id, espn, home_team, away_team, week)
 
 # for testing
-# live_games <- readRDS(url(
-#   "http://www.habitatring.com/games_alt.rds"
-# )) %>%
-#   dplyr::filter(
-#     season == 2020,
-#     week == 21,
-#     !is.na(result)
-#   ) %>%
-#   # head(10) %>%
-#   dplyr::select(game_id, espn, home_team, away_team, week)
+# live_games <- readRDS(url("http://www.habitatring.com/games_alt.rds")) %>%
+#   dplyr::filter(season == 2020, week == 21)
 
 if (nrow(live_games) > 0) {
 
@@ -97,12 +89,6 @@ if (nrow(live_games) > 0) {
   for_tweeting <- plays %>%
     left_join(old_plays, by = c("game_id", "index")) %>%
     filter(is.na(old))
-
-  # see the plays lined up
-  # for_tweeting
-
-  # for testing: limited to a few tweets
-  # for_tweeting <- for_tweeting %>% head(5)
 
   # if there are plays to tweet, load the library and tweet
   if (nrow(for_tweeting) > 0) {
