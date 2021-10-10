@@ -49,7 +49,7 @@ tweet_play <- function(df) {
   )
 
   confidence <- if_else(
-    confidence == "(MEDIUM)" & (abs(wp1 / wp2) > 1.2 | (100 - wp2) / (100 - wp1) > 1.2),
+    confidence == "(MEDIUM)" & (abs(wp1 / wp2) > 1.15 | (100 - wp2) / (100 - wp1) > 1.15),
     "(STRONG)",
     confidence
   )
