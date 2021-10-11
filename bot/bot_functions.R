@@ -8,6 +8,18 @@ tweet_play <- function(df) {
     nfl4th::make_table_data() %>%
     arrange(-choice_prob)
 
+  # if you're outside the 50, don't show field goal
+  if (df$yardline_100 > 50) {
+    tableData <- tableData %>%
+      dplyr::filter(choice != "Field goal attempt")
+  }
+
+  # if inside 35, don't show punt
+  if (df$yardline_100 < 35) {
+    tableData <- tableData %>%
+      dplyr::filter(choice != "Punt")
+  }
+
   play_desc <- df$desc %>%
     stringr::str_replace("\\([:digit:]*\\:[:digit:]+\\)\\s", "") %>%
     substr(1, 100)
