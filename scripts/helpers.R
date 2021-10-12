@@ -43,7 +43,7 @@ make_table <- function(df, current_situation) {
       column_labels.border.bottom.width = px(2)
     ) %>%
     fmt_number(
-      columns = c(choice_prob, success_prob, success_wp, fail_wp), decimals = 0
+      columns = vars(choice_prob, success_prob, success_wp, fail_wp), decimals = 0
     ) %>%
     tab_source_note(md("**Source**: @ben_bot_baldwin")) %>%
     tab_style(
@@ -51,7 +51,7 @@ make_table <- function(df, current_situation) {
         cell_text(color = "red", weight = "bold")
       ),
       locations = cells_body(
-        columns = c(choice_prob)
+        columns = vars(choice_prob)
       )
     )  %>%
     tab_style(
@@ -59,7 +59,7 @@ make_table <- function(df, current_situation) {
         cell_text(weight = "bold")
       ),
       locations = cells_body(
-        columns = c(choice)
+        columns = vars(choice)
       )
     )  %>%
     tab_spanner(label = "Win % if",
