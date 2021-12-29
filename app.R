@@ -350,15 +350,15 @@ server <- function(session, input, output) {
   # say what the right decision is
   output$some_text <- renderText({
 
-    return(glue::glue("<font size='+2'>Correct choice: <span style='color:red'>{tableData() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice)}</span> (difference:
-      <span style='color:green'> <strong> {round(tableData() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice_prob) - tableData() %>% arrange(-choice_prob) %>% dplyr::slice(2) %>% pull(choice_prob), 1)}%</strong></span>)</font>"))
+    return(glue::glue("<font size='+2'><span style='color:red'>{tableData() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice)}</span> (+
+      <span style='color:green'> <strong> {round(tableData() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice_prob) - tableData() %>% arrange(-choice_prob) %>% dplyr::slice(2) %>% pull(choice_prob), 1)}% WP</strong></span>)</font>"))
 
   })
 
   output$some_text2 <- renderText({
 
-    return(glue::glue("<font size='+2'>Correct choice: <span style='color:red'>{tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice)}</span> (difference:
-      <span style='color:green'> <strong> {round(tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice_prob) - tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(2) %>% pull(choice_prob), 1)}%</strong></span>)</font>"))
+    return(glue::glue("<font size='+2'><span style='color:red'>{tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice)}</span> (+
+      <span style='color:green'> <strong> {round(tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(1) %>% pull(choice_prob) - tableData2() %>% arrange(-choice_prob) %>% dplyr::slice(2) %>% pull(choice_prob), 1)}% WP</strong></span>)</font>"))
 
   })
 
