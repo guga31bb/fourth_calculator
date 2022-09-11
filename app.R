@@ -43,7 +43,7 @@ ui <- function(request) {
                                    selectInput(
                                      inputId =  "season",
                                      label = "Season:",
-                                     choices = 2014:2021,
+                                     choices = 2014:2022,
                                      selected = 2020
                                    ),
 
