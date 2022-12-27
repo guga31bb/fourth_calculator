@@ -54,8 +54,8 @@ tweet_play <- function(df) {
 
   confidence <- case_when(
     abs(diff) < 1 ~ "",
-    abs(diff) >= 1 & abs(diff) < 3 ~ "(MEDIUM)",
-    abs(diff) >= 3 & abs(diff) <= 5 ~ "(STRONG)",
+    abs(diff) >= 1 & abs(diff) < 2.5 ~ "(MEDIUM)",
+    abs(diff) >= 2.5 & abs(diff) <= 5 ~ "(STRONG)",
     abs(diff) >= 5 & abs(diff) <= 10 ~ "(VERY STRONG)",
     abs(diff) > 10 ~ "(YOU BETTER DO THIS)"
   )
