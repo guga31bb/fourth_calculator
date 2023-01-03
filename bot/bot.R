@@ -40,7 +40,9 @@ live_games <- readRDS(url(
       )
     ) %>%
   dplyr::filter(started == 1) %>%
-  dplyr::select(game_id, espn, home_team, away_team, week)
+  dplyr::select(game_id, espn, home_team, away_team, week) %>%
+  # stop tweeting about the Bills-Bengals game
+  dplyr::filter(game_id != "2022_17_BUF_CIN")
 
 # for testing
 # live_games <- readRDS(url("http://www.habitatring.com/games_alt.rds")) %>%
