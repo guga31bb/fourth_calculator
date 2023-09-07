@@ -92,7 +92,9 @@ tweet_play <- function(df) {
 
   # don't post if every choice is < 1 or > 99
   if (wp1 > 1 & wp2 > 1 & wp1 < 99 & wp2 < 99) {
-    post_tweet(text, media = "bot/post.png")
+    # post_tweet(text, media = "bot/post.png")
+    post_tweet(text)
+    
   }
   # post_tweet(text)
 
