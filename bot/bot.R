@@ -30,12 +30,7 @@ live_games <- readRDS(url(
     #
     espn = dplyr::case_when(
       # hard code for playoff games not in Lee's file
-      game_id == "2021_19_LV_CIN"   ~ "401326627",
-      game_id == "2021_19_NE_BUF"   ~ "401326626",
-      game_id == "2021_19_PHI_TB"   ~ "401326630",
-      game_id == "2021_19_SF_DAL"   ~ "401326629",
-      game_id == "2021_19_PIT_KC"   ~ "401326628",
-      game_id == "2021_19_ARI_LA"   ~ "401326625",
+      game_id == "2023_DET_KC"   ~ "401547353",
       TRUE ~ espn
       )
     ) %>%
