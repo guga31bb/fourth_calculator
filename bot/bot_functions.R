@@ -2,6 +2,10 @@
 
 # function to tweet out one play
 tweet_play <- function(df) {
+  
+  seconds = df$quarter_seconds_remaining %% 60
+  mins = (df$quarter_seconds_remaining / 60) |> floor()
+  time = glue::glue("Q{df$qtr} {hms::hms(df$quarter_seconds_remaining) %>% substr(4, 8)}") |> as.character()
 
   tableData <- df %>%
     nfl4th::add_4th_probs() %>%
@@ -83,7 +87,7 @@ tweet_play <- function(df) {
     glue::glue(
       "
   ---> {df$away_team} ({df$away_score}) @ {df$home_team} ({df$home_score}) <---
-  {posteam} has 4th & {df$ydstogo} {position}
+  {posteam} has 4th & {df$ydstogo} {position}, {time}
 
   Recommendation {confidence}: {rec_emoji} {choice} (+{round(diff, 1)} WP)
   Actual play: {choice_emoji} {play_desc}
@@ -93,7 +97,7 @@ tweet_play <- function(df) {
   # don't post if every choice is < 1 or > 99
   if (wp1 > 1 & wp2 > 1 & wp1 < 99 & wp2 < 99) {
     # post_tweet(text, media = "bot/post.png")
-    post_tweet(text)
+    tweet_post(text)
     
   }
   # post_tweet(text)

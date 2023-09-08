@@ -30,7 +30,7 @@ live_games <- readRDS(url(
     #
     espn = dplyr::case_when(
       # hard code for playoff games not in Lee's file
-      game_id == "2023_DET_KC"   ~ "401547353",
+      game_id == "2023_01_DET_KC"   ~ "401547353",
       TRUE ~ espn
       )
     ) %>%
@@ -98,6 +98,7 @@ if (nrow(live_games) > 0) {
     suppressMessages(
       library(rtweet)
     )
+    rtweet::auth_as("/srv/shiny-server/box_scores/oauth2_authentication.rds")
 
     # do the thing
     for (x in 1 : nrow(for_tweeting)) {
