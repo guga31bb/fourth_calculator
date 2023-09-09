@@ -98,6 +98,8 @@ if (nrow(live_games) > 0) {
     suppressMessages(
       library(rtweet)
     )
+    
+    # https://docs.ropensci.org/rtweet/articles/auth.html
     rtweet::client_as("/srv/shiny-server/box_scores/Baldwin bot.rds")
     rtweet::auth_as("/srv/shiny-server/box_scores/oauth2_authentication.rds")
 
