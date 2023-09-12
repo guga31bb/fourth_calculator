@@ -101,7 +101,9 @@ if (nrow(live_games) > 0) {
     
     # https://docs.ropensci.org/rtweet/articles/auth.html
     rtweet::client_as("/srv/shiny-server/box_scores/Baldwin bot.rds")
-    rtweet::auth_as("/srv/shiny-server/box_scores/oauth2_authentication.rds")
+    rtweet::auth_as("/srv/shiny-server/box_scores/oauth2.rds")
+    rtweet::auth_save(oauth2, "my_oauth2") 
+    rtweet::client_save(client)
 
     # do the thing
     for (x in 1 : nrow(for_tweeting)) {
