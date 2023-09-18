@@ -82,7 +82,7 @@ tweet_play <- function(df) {
   table <- make_table(tableData, df)
 
   # chromote::set_chrome_args("--disable-crash-reporter")
-  # table %>% gtsave("bot/post.png")
+  table %>% gtsave("bot/post.png")
 
   text <-
     glue::glue(
@@ -93,6 +93,10 @@ tweet_play <- function(df) {
   Recommendation {confidence}: {rec_emoji} {choice} (+{round(diff, 1)} WP)
   Actual play: {choice_emoji} {play_desc}
   ")
+  
+  sink("bot/text.txt")
+  cat(text)
+  sink()
 
 
   # don't post if every choice is < 1 or > 99
@@ -101,7 +105,7 @@ tweet_play <- function(df) {
     # tweet_post(text)
     # py_tweet_play(text)
     
-    system(glue::glue('python3 ../box_scores/tweet.py {text}'))
+    system(glue::glue("python3 ../box_scores/tweet.py"))
 
   }
   # post_tweet(text)
