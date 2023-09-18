@@ -99,8 +99,10 @@ tweet_play <- function(df) {
   if (wp1 > 1 & wp2 > 1 & wp1 < 99 & wp2 < 99) {
     # post_tweet(text, media = "bot/post.png")
     # tweet_post(text)
-    py_tweet_play(text)
+    # py_tweet_play(text)
     
+    system(glue::glue('python3 ../box_scores/tweet.py {text}'))
+
   }
   # post_tweet(text)
 

@@ -95,8 +95,6 @@ if (nrow(live_games) > 0) {
   # if there are plays to tweet, load the library and tweet
   if (nrow(for_tweeting) > 0) {
     
-    reticulate::source_python("../box_scores/tweet.py")
-
     # do the thing
     for (x in 1 : nrow(for_tweeting)) {
       tweet_play(for_tweeting %>% dplyr::slice(x))
