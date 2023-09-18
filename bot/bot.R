@@ -94,16 +94,8 @@ if (nrow(live_games) > 0) {
 
   # if there are plays to tweet, load the library and tweet
   if (nrow(for_tweeting) > 0) {
-
-    suppressMessages(
-      library(rtweet)
-    )
     
-    # https://docs.ropensci.org/rtweet/articles/auth.html
-    rtweet::client_as("/srv/shiny-server/box_scores/Baldwin bot.rds")
-    rtweet::auth_as("/srv/shiny-server/box_scores/oauth2.rds")
-    rtweet::auth_save(oauth2, "my_oauth2") 
-    rtweet::client_save(client)
+    reticulate::source_python("../box_scores/tweet.py")
 
     # do the thing
     for (x in 1 : nrow(for_tweeting)) {
