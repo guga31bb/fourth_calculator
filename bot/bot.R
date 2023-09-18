@@ -98,6 +98,7 @@ if (nrow(live_games) > 0) {
     # do the thing
     for (x in 1 : nrow(for_tweeting)) {
       tweet_play(for_tweeting %>% dplyr::slice(x))
+      Sys.sleep(1)
     }
 
   }
