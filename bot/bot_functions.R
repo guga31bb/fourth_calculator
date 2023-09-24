@@ -97,10 +97,20 @@ tweet_play <- function(df) {
   sink("bot/text.txt")
   cat(text)
   sink()
+  
+  
+  tweet_me <- 0
+  if (wp1 > 1 & wp2 > 1 & wp1 < 99 & wp2 < 99) {
+   tweet_me <- 1 
+  }
 
+  # don't tweet obvious punt / FG
+  if (choice %in% c("Punt", "Field goal attempt") & abs(diff) > 1.5) {
+    tweet_me <- 0
+  }
 
   # don't post if every choice is < 1 or > 99
-  if (wp1 > 1 & wp2 > 1 & wp1 < 99 & wp2 < 99) {
+  if (tweet_me == 1) {
     # post_tweet(text, media = "bot/post.png")
     # tweet_post(text)
     # py_tweet_play(text)
