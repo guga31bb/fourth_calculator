@@ -7,10 +7,13 @@ tweet_play <- function(df) {
   mins = (df$quarter_seconds_remaining / 60) |> floor()
   time = glue::glue("Q{df$qtr} {hms::hms(df$quarter_seconds_remaining) %>% substr(4, 8)}") |> as.character()
 
-  tableData <- df %>%
-    nfl4th::add_4th_probs() %>%
-    nfl4th::make_table_data() %>%
-    arrange(-choice_prob)
+  suppressWarnings(
+    tableData <- df %>%
+      nfl4th::add_4th_probs() %>%
+      nfl4th::make_table_data() %>%
+      arrange(-choice_prob)
+  )
+
 
   # if you're outside the 50, don't show field goal
   if (df$yardline_100 > 50) {
