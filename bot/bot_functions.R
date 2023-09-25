@@ -85,7 +85,9 @@ tweet_play <- function(df) {
   table <- make_table(tableData, df)
 
   # chromote::set_chrome_args("--disable-crash-reporter")
-  table %>% gtsave("bot/post.png")
+  suppressMessages(
+    table %>% gtsave("bot/post.png")
+  )
 
   text <-
     glue::glue(
