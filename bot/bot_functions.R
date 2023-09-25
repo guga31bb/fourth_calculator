@@ -100,12 +100,19 @@ tweet_play <- function(df) {
   
   
   tweet_me <- 0
-  if (wp1 > 1 & wp2 > 1 & wp1 < 99 & wp2 < 99) {
+  if (wp1 > 2 & wp2 > 2 & wp1 < 98 & wp2 < 98) {
    tweet_me <- 1 
   }
 
   # don't tweet obvious punt / FG
-  if (choice %in% c("Punt", "Field goal attempt") & abs(diff) > 1.5) {
+  if (choice %in% c("Punt", "Field goal attempt") & abs(diff) >= 1.0) {
+    message(glue::glue("Skipping play {text}"))
+    tweet_me <- 0
+  }
+  
+  # don't tweet obvious punt / FG
+  if (choice %in% c("Toss-up") & abs(diff) < 0.8) {
+    message(glue::glue("Skipping play {text}"))
     tweet_me <- 0
   }
 
