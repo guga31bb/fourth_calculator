@@ -84,6 +84,7 @@ tweet_play <- function(df) {
   # chromote::set_chrome_args("--disable-crash-reporter")
   suppressMessages(
     table %>% gtsave("bot/post.png")
+    
   )
 
   text <-
@@ -100,6 +101,7 @@ tweet_play <- function(df) {
   cat(text)
   sink()
   
+  message(glue::glue("Here is the play {text}"))
   
   tweet_me <- 0
   if (wp1 > 2 & wp2 > 2 & wp1 < 98 & wp2 < 98) {
@@ -108,26 +110,20 @@ tweet_play <- function(df) {
 
   # don't tweet obvious punt / FG
   if (choice %in% c("Punt", "Field goal attempt") & abs(diff) >= 1.0) {
-    message(glue::glue("Skipping play {text}"))
     tweet_me <- 0
   }
   
   # don't tweet obvious punt / FG
-  if (choice %in% c("Toss-up") & abs(diff) < 0.8) {
-    message(glue::glue("Skipping play {text}"))
+  if (choice %in% c("Toss-up") & abs(diff) < 0.5) {
     tweet_me <- 0
   }
 
-  # don't post if every choice is < 1 or > 99
   if (tweet_me == 1) {
-    # post_tweet(text, media = "bot/post.png")
-    # tweet_post(text)
-    # py_tweet_play(text)
-    
     system(glue::glue("python3 ../box_scores/tweet.py"))
-
+    message("Tweet posted!")
+  } else {
+    "Skipping play"
   }
-  # post_tweet(text)
 
 }
 
