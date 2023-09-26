@@ -79,13 +79,7 @@ tweet_play <- function(df) {
   posteam <- df$posteam
   defteam <- if_else(df$posteam == df$home_team, df$away_team, df$home_team)
 
-  table <- make_table(tableData, df)
-
   # chromote::set_chrome_args("--disable-crash-reporter")
-  suppressMessages(
-    table %>% gtsave("bot/post.png")
-    
-  )
 
   text <-
     glue::glue(
@@ -101,7 +95,11 @@ tweet_play <- function(df) {
   cat(text)
   sink()
   
-  message(glue::glue("Here is the play {text}"))
+  log_text <-
+    glue::glue(
+      "{df$away_team} ({df$away_score}) @ {df$home_team} ({df$home_score}) | {posteam} 4th & {df$ydstogo} {position}, {time}
+      {confidence}: {choice} (+{round(diff, 1)} WP)
+      ")
   
   tweet_me <- 0
   if (wp1 > 2 & wp2 > 2 & wp1 < 98 & wp2 < 98) {
@@ -119,10 +117,12 @@ tweet_play <- function(df) {
   }
 
   if (tweet_me == 1) {
+    table <- make_table(tableData, df)
+    table %>% gtsave("bot/post.png")
     system(glue::glue("python3 ../box_scores/tweet.py"))
     message("Tweet posted!")
   } else {
-    "Skipping play"
+      message(glue::glue("Skipping play: {log_text}"))
   }
 
 }
