@@ -1,7 +1,7 @@
 `%>%`<-magrittr::`%>%`
 
 # function to tweet out one play
-tweet_play <- function(df) {
+tweet_play <- function(df, n_games) {
   
   seconds = df$quarter_seconds_remaining %% 60
   mins = (df$quarter_seconds_remaining / 60) |> floor()
@@ -102,18 +102,20 @@ tweet_play <- function(df) {
       ")
   
   tweet_me <- 0
-  if (wp1 > 2 & wp2 > 2 & wp1 < 98 & wp2 < 98) {
-   tweet_me <- 1 
-  }
-
-  # don't tweet obvious punt / FG
-  if (choice %in% c("Punt", "Field goal attempt") & abs(diff) >= 1.0) {
-    tweet_me <- 0
+  
+  # tweet if should go for it
+  if (choice == "Go for it" & confidence %in% c("(MEDIUM)", "(STRONG)", "(VERY STRONG)", "(YOU BETTER DO THIS)")) {
+    tweet_me <- 1 
   }
   
-  # don't tweet obvious punt / FG
-  if (choice %in% c("Toss-up") & abs(diff) < 0.5) {
-    tweet_me <- 0
+  # tweet red zone
+  if (df$yardline_100 <= 20 & df$ydftogo <= 10) {
+    tweet_me <- 1
+  }
+  
+  # tweet all plays from days with 2 or fewer games (rate limit doesn't matter)
+  if (n_games <= 2) {
+    tweet_me <- 1
   }
 
   if (tweet_me == 1) {

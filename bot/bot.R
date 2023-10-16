@@ -3,18 +3,15 @@ message(glue::glue("------------------------------------------{lubridate::now()}
 source('bot/bot_functions.R')
 
 # get live games
-live_games <- readRDS(url(
+today <- readRDS(url(
   "http://www.habitatring.com/games_alt.rds"
 )) %>%
   dplyr::filter(
-
-    # hasn't finished yet
-    is.na(result),
-
     # happening today
     gameday == as.character(lubridate::today("US/Pacific"))
+    ) 
 
-    ) %>%
+live_games <- today %>%
   dplyr::mutate(
     # there's probably a better way to do this but it seems to work
     current_hour = lubridate::hour(lubridate::now()),
@@ -34,7 +31,7 @@ live_games <- readRDS(url(
       TRUE ~ espn
       )
     ) %>%
-  dplyr::filter(started == 1) %>%
+  dplyr::filter(started == 1, is.na(result)) %>%
   dplyr::select(game_id, espn, home_team, away_team, week) %>%
   # stop tweeting about the Bills-Bengals game
   dplyr::filter(game_id != "2022_17_BUF_CIN")
@@ -97,7 +94,7 @@ if (nrow(live_games) > 0) {
     
     # do the thing
     for (x in 1 : nrow(for_tweeting)) {
-      tweet_play(for_tweeting %>% dplyr::slice(x))
+      tweet_play(for_tweeting %>% dplyr::slice(x), nrow(today))
       Sys.sleep(1)
     }
 
