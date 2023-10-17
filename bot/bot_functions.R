@@ -109,7 +109,7 @@ tweet_play <- function(df, n_games) {
   }
   
   # tweet red zone
-  if (df$yardline_100 <= 20 & df$ydftogo <= 10) {
+  if (df$yardline_100 <= 20 & df$ydstogo <= 10) {
     tweet_me <- 1
   }
   
