@@ -104,13 +104,8 @@ tweet_play <- function(df, n_games) {
   tweet_me <- 0
   
   # tweet if should go for it
-  if (choice == "Go for it" & confidence %in% c("(MEDIUM)", "(STRONG)", "(VERY STRONG)", "(YOU BETTER DO THIS)")) {
+  if (choice == "Go for it" & confidence %in% c("(STRONG)", "(VERY STRONG)", "(YOU BETTER DO THIS)")) {
     tweet_me <- 1 
-  }
-  
-  # tweet red zone
-  if (df$yardline_100 <= 20 & df$ydstogo <= 10) {
-    tweet_me <- 1
   }
   
   # tweet all plays from days with 2 or fewer games (rate limit doesn't matter)
