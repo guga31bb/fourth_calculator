@@ -112,6 +112,15 @@ tweet_play <- function(df, n_games) {
   if (n_games <= 2) {
     tweet_me <- 1
   }
+  
+  # don't tweet if game is over
+  if (wp1 > 98 & wp2 > 98) {
+    tweet_me <- 0
+  }
+  
+  if (wp1 < 2 & wp2 < 2) {
+    tweet_me <- 0
+  }
 
   if (tweet_me == 1) {
     table <- make_table(tableData, df)
