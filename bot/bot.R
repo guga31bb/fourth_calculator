@@ -1,4 +1,6 @@
 message(glue::glue("------------------------------------------{lubridate::now()}"))
+nfl4th::nfl4th_clear_cache()
+nflreadr::clear_cache()
 
 source('bot/bot_functions.R')
 
