@@ -27,7 +27,7 @@ live_games <- today %>%
     #
     espn = dplyr::case_when(
       # hard code for playoff games not in Lee's file
-      game_id == "2023_01_DET_KC"   ~ "401547353",
+      game_id == "2023_20_KC_BUF"   ~ "401547758",
       TRUE ~ espn
       )
     ) %>%
