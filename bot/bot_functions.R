@@ -143,8 +143,10 @@ tweet_play <- function(df, n_games) {
     tryCatch(
       {
         bskyr::bs_post(
-          text = text
-          # images = c("bot/post.png")
+          text = text,
+          images = c("bot/post.png"),
+          images_alt = "A table of the underlying computations for the 4th down recommendation"
+          
         )
       },
       error = function(e) "BlueSky error"
