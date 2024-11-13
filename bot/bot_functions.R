@@ -58,8 +58,8 @@ tweet_play <- function(df, n_games) {
 
   confidence <- case_when(
     abs(diff) < 1 ~ "",
-    abs(diff) >= 1 & abs(diff) < 2.5 ~ "(MEDIUM)",
-    abs(diff) >= 2.5 & abs(diff) <= 5 ~ "(STRONG)",
+    abs(diff) >= 1 & abs(diff) < 2.25 ~ "(MEDIUM)",
+    abs(diff) >= 2.25 & abs(diff) <= 5 ~ "(STRONG)",
     abs(diff) >= 5 & abs(diff) <= 10 ~ "(VERY STRONG)",
     abs(diff) > 10 ~ "(YOU BETTER DO THIS)"
   )
@@ -101,34 +101,54 @@ tweet_play <- function(df, n_games) {
       {confidence}: {choice} (+{round(diff, 1)} WP)
       ")
   
-  tweet_me <- 0
+  go_rec <- 0
+  game_over <- 0
+  nfl_sunday <- 1
   
   # tweet if should go for it
   if (choice == "Go for it" & confidence %in% c("(STRONG)", "(VERY STRONG)", "(YOU BETTER DO THIS)")) {
-    tweet_me <- 1 
+    go_rec <- 1 
   }
   
   # tweet all plays from days with 2 or fewer games (rate limit doesn't matter)
   if (n_games <= 2) {
-    tweet_me <- 1
+    nfl_sunday <- 0
   }
   
-  # don't tweet if game is over
+  # unless the game is over
   if (wp1 > 98 & wp2 > 98) {
-    tweet_me <- 0
+    game_over <- 1
   }
   
   if (wp1 < 2 & wp2 < 2) {
-    tweet_me <- 0
+    game_over <- 1
   }
-
-  if (tweet_me == 1) {
+  
+  # if game not over, make the table
+  if (game_over == 0) {
     table <- make_table(tableData, df)
     table %>% gtsave("bot/post.png")
+  }
+
+  # if game not over and either standalone game or go == 1, tweet
+  if (game_over == 0 & (nfl_sunday == 0 | go_rec == 1)) {
     system(glue::glue("python3 ../box_scores/tweet.py"))
     message("Tweet posted!")
   } else {
       message(glue::glue("Skipping play: {log_text}"))
+  }
+  
+  # bluesky post
+  if (game_over == 0) {
+    tryCatch(
+      {
+        bskyr::bs_post(
+          text = text
+          # images = c("bot/post.png")
+        )
+      },
+      error = function(e) "BlueSky error"
+    )
   }
 
 }
