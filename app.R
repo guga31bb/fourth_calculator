@@ -43,7 +43,7 @@ ui <- function(request) {
                                    selectInput(
                                      inputId =  "season",
                                      label = "Season:",
-                                     choices = 2014:2025,
+                                     choices = 2014:nflreadr::get_current_season() |> as.numeric(),
                                      selected = 2020
                                    ),
 
