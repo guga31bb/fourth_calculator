@@ -1,0 +1,4 @@
+# R binary data files
+*.Rdata
+*.rda
+*.rds
