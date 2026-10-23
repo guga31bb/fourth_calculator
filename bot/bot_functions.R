@@ -103,18 +103,19 @@ tweet_play <- function(df, n_games) {
   
   go_rec <- 0
   game_over <- 0
-  nfl_sunday <- 1
-  
+
   # tweet if should go for it
   if (choice == "Go for it" & confidence %in% c("(STRONG)", "(VERY STRONG)", "(YOU BETTER DO THIS)")) {
-    go_rec <- 1 
+    go_rec <- 1
   }
-  
-  # tweet all plays from days with 2 or fewer games (rate limit doesn't matter)
-  if (n_games <= 2) {
-    nfl_sunday <- 0
+
+  # also tweet last 4 mins of 4th quarter if game still in doubt
+  late_close <- 0
+  if (df$qtr == 4 & df$quarter_seconds_remaining <= 240 &
+      any(tableData$choice_prob >= 10 & tableData$choice_prob <= 90)) {
+    late_close <- 1
   }
-  
+
   # unless the game is over
   if (wp1 > 98 & wp2 > 98) {
     game_over <- 1
@@ -130,8 +131,8 @@ tweet_play <- function(df, n_games) {
     table %>% gtsave("bot/post.png")
   }
 
-  # if game not over and either standalone game or go == 1, tweet
-  if (game_over == 0 & (nfl_sunday == 0 | go_rec == 1)) {
+  # if game not over and strong go rec or close late game, tweet (X API charges per post)
+  if (game_over == 0 & (go_rec == 1 | late_close == 1)) {
     system(glue::glue("python3 ../box_scores/tweet.py"))
     message("Tweet posted!")
   } else {
